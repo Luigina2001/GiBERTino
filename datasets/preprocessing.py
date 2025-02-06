@@ -4,8 +4,8 @@ import torch
 from transformers import AutoModel, AutoTokenizer, pipeline
 
 
-def load_dataset(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
+def load_dataset(file_path: str):
+    with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return data
 
@@ -33,7 +33,9 @@ class SequenceBERT(torch.nn.Module):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def forward(self, edus):
-        tokens = self.tokenizer(edus, return_tensors="pt", padding=True, truncation=True)
+        tokens = self.tokenizer(
+            edus, return_tensors="pt", padding=True, truncation=True
+        )
         with torch.no_grad():
             embedding = self.bert(**tokens).last_hidden_state.mean(dim=1)
         return embedding
