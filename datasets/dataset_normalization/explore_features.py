@@ -1,15 +1,9 @@
-import json
-
+from utils import load_dataset
 global final_global_relations
-
-def load_dataset(dataset_path):
-    with open(dataset_path, "r", encoding="utf-8") as f:
-        dataset = json.load(f)
-    return dataset
 
 
 def explore_features(dataset, dataset_name):
-    if not dataset:
+    if not dataset: # noqa
         print("Dataset is empty or invalid.")
 
     # --- ALL AVAILABLE FEATURES IN THE DATASET ---
@@ -37,12 +31,12 @@ def explore_features(dataset, dataset_name):
     print(relation_types)
 
 
-def compare_datasets(datasets):
-    feature_sets = {name: set() for name in datasets}
-    relation_sets = {name: set() for name in datasets}
+def compare_datasets(datasets): # noqa
+    feature_sets = {name: set() for name in datasets} # noqa
+    relation_sets = {name: set() for name in datasets} # noqa
     sub_attribute_sets = {name: set() for name in datasets}
 
-    for name, dataset in datasets.items():
+    for name, dataset in datasets.items(): # noqa
         for entry in dataset:
             feature_sets[name].update(entry.keys())
             if "relations" in entry:
@@ -57,7 +51,7 @@ def compare_datasets(datasets):
     # Compare feature sets
     print("\nComparison of dataset features:")
     all_features = set.union(*feature_sets.values())
-    for name, features in feature_sets.items():
+    for name, features in feature_sets.items(): # noqa
         missing_features = all_features - features
         if bool(missing_features):
             print(f"{name} is missing: {missing_features}")
@@ -65,7 +59,7 @@ def compare_datasets(datasets):
     # Compare sub-attributes
     print("\nComparison of dataset sub-attributes:")
     all_sub_attributes = set.union(*sub_attribute_sets.values())
-    for name, sub_attrs in sub_attribute_sets.items():
+    for name, sub_attrs in sub_attribute_sets.items(): # noqa
         missing_sub_attrs = all_sub_attributes - sub_attrs
         if bool(missing_sub_attrs):
             print(f"{name} is missing sub-attributes: {missing_sub_attrs}")
@@ -74,7 +68,7 @@ def compare_datasets(datasets):
     print("\nComparison of relationship types:")
     all_relations = set.union(*relation_sets.values())
     final_global_relations.update(all_relations)
-    for name, relations in relation_sets.items():
+    for name, relations in relation_sets.items(): # noqa
         missing_relations = all_relations - relations
         print(f"{name} is missing: {missing_relations}")
 

@@ -2,7 +2,7 @@ import json
 
 
 class DataCleaner:
-    def __init__(self, dataset_paths):
+    def __init__(self, dataset_paths): # noqa
         self.dataset_paths = dataset_paths
 
     @staticmethod

@@ -1,27 +1,39 @@
 import logging
 import os
 import random
-from typing import Literal
+from collections import defaultdict
+
+import numpy as np
+from typing import Literal, Optional
 
 import matplotlib.colors as mcolors
+import matplotlib.patches as mpatches
 import networkx as nx
-import numpy as np
 import torch
 from matplotlib import pyplot as plt
+from sentence_transformers import SentenceTransformer
 from torch_geometric.data import HeteroData
 from torch_geometric.utils.convert import to_networkx
 from tqdm import tqdm
-import matplotlib.patches as mpatches
-from datasets.preprocessing import extract_features, load_dataset
+from transformers import pipeline
+import transformers.utils.logging
+
+from utils import load_dataset
+from utils.constants import SENTIMENTS
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
+# TODO: disable huggingface logger because this does not work
+transformers.utils.logging.set_verbosity_error()  # disable info and warning logging (progress bar and updates)
+
 
 class GraphBuilder:
-    def __init__(self, dataset_path: str, dataset_name: Literal['MOLWENI', 'STAC', 'MINECRAFT']):
+    def __init__(self, dataset_path: str, dataset_name: Literal['MOLWENI', 'STAC', 'MINECRAFT'],
+                 sentence_model: str = 'Alibaba-NLP/gte-modernbert-base',
+                 sentiment_model: str = 'finiteautomata/bertweet-base-sentiment-analysis'):
         """
         Initialize the GraphBuilder with the dataset path and name.
 
@@ -30,75 +42,110 @@ class GraphBuilder:
             dataset_name (Literal['MOLWENI', 'STAC', 'MINECRAFT']): Name of the dataset.
         """
         logger.info(f"Loading dataset from {dataset_path}")
-
         self.dialogs = load_dataset(dataset_path)
+        logger.info(f"{dataset_name} dataset loaded successfully.")
+
         self.dataset_path = dataset_path
         self.dataset_name = dataset_name
-
-        logger.info(f"{dataset_name} dataset loaded successfully.")
+        self.sentence_model = SentenceTransformer(sentence_model)
+        self.sentiment_model = pipeline('sentiment-analysis', model=sentiment_model)
+        self.graphs = []
 
     def __call__(self):
         """
         Build a heterogeneous graph from the dataset where edges represent relationships between EDUs.
         """
-
         logger.info(f"Starting graph construction for dataset {self.dataset_name}...")
-        # Use tqdm to show progress for dialog processing
+
         for dialog in tqdm(self.dialogs, desc="Processing dialogs"):
             graph_data = HeteroData()
             node_idxs = []
+            text_embeddings = []
+            sentiment_labels = []
+            speakers = {}
+            speakers_ids = []
 
-            for edu_idx in range(len(dialog["edus"])):
+            for edu_idx, edu in enumerate(dialog["edus"]):
+                text_embeddings.append(self.sentence_model.encode(edu["text"]))
+                sentiment = self.sentiment_model(edu["text"])[0]['label']
+                sentiment_labels.append(SENTIMENTS[sentiment])
+
+                if edu["speaker"] not in speakers:
+                    speakers[edu["speaker"]] = len(speakers)
+
+                speakers_ids.append(speakers[edu["speaker"]])
                 node_idxs.append(edu_idx)
 
-            embeddings, sentiments, speakers = extract_features(dialog["edus"])
+            embeddings_dim = text_embeddings[0].shape[-1]
+            text_embeddings = torch.tensor(np.array(text_embeddings), dtype=torch.double)
+            sentiment_labels = torch.tensor(np.array(sentiment_labels), dtype=torch.int8)
+            speakers_ids = torch.tensor(np.array(speakers_ids), dtype=torch.int8)
 
-            speaker_to_id = [i for i, s in enumerate(set(speakers))]
-            node_ids = torch.tensor(np.array(speaker_to_id), dtype=torch.float)
-            text_embeddings = torch.tensor(np.array(embeddings), dtype=torch.float)
-            sentiment_labels = torch.tensor(sentiments, dtype=torch.float)
+            # match dim 1
+            sentiment_labels = sentiment_labels.unsqueeze(1).repeat(1, embeddings_dim)
+            speakers_ids = speakers_ids.unsqueeze(1).repeat(1, embeddings_dim)
 
-            node_features = torch.cat([node_ids, text_embeddings, sentiment_labels], dim=-1)
+            node_features = torch.cat([text_embeddings, sentiment_labels, speakers_ids], dim=-1)
+
             graph_data["edu"].x = node_features
+
+            edge_dict = defaultdict(list)
 
             for rel_idx in range(len(dialog["relations"])):
                 src = dialog["relations"][rel_idx]["x"]
                 dst = dialog["relations"][rel_idx]["y"]
                 rel_type = dialog["relations"][rel_idx]["type"]
 
-                graph_data["edu", rel_type, "edu"].edge_index = (torch.tensor([[src, dst]]).t().contiguous())
+                edge_dict[rel_type].append((src, dst))
 
-        self.graph = graph_data
-        print(dialog["id"])
+            for rel_type, edges in edge_dict.items():
+                edge_tensor = torch.tensor(edges, dtype=torch.long).t().contiguous()
+                graph_data["edu", rel_type, "edu"].edge_index = edge_tensor
+
+            self.graphs.append(graph_data)
+
         logger.info("Graph construction completed successfully.")
 
-    def save_graph(self, path: str):
+    def save_graphs(self, path: str, graph: Optional[HeteroData]):
         """
         Save the constructed graph to a file.
 
         Args:
-            path (str): Path where the graph will be saved.
+            path (str): Path where the graphs will be saved.
+            graph: Specific graph to save. Optional.
         """
-        if self.graph is None:
+        if len(self.graphs) == 0 and graph is None:
             logger.warning("No graph to save. Please run the graph construction first.")
             return
 
-        logger.info(f"Saving graph to {path}")
-        torch.save(self.graph, path)
-        logger.info("Graph saved successfully.")
+        if graph is None and not os.path.isdir(path):
+            logger.warning("Path is not a directory. Please specify a directory")
+            return
 
-    def display_graph(self):
+        logger.info(f"Saving graphs to {path}")
+
+        if graph is None:
+            os.makedirs(path, exist_ok=True)
+
+            for idx, graph in enumerate(self.graphs):
+                graph_path = os.path.join(path, str(idx))
+                torch.save(graph, os.path.join(graph_path, ".pt"))
+        else:
+            torch.save(graph, path)
+        logger.info("Graphs saved successfully.")
+
+    def display_graph(self, idx: int):
         """
         Display the graph using networkx and matplotlib. If display is not possible,
         save the graph to a file and log the path.
         """
-        if self.graph is None:
+        if len(self.graphs) == 0:
             logger.warning("No graph to display. Please run the graph construction first.")
             return
 
         try:
             # Convert the graph to a NetworkX graph for visualization
-            G = to_networkx(self.graph)
+            G = to_networkx(self.graphs[idx])
 
             plt.figure(figsize=(10, 8))
             pos = nx.spring_layout(G, seed=42)  # Layout for consistent visualization
@@ -128,41 +175,10 @@ class GraphBuilder:
         except Exception as e:
             logger.warning(f"Graph display failed: {e}. Saving graph to a file instead.")
             save_path = os.path.join(os.getcwd(), f"{self.dataset_name}_graph.pth")
-            self.save_graph(save_path)
+            self.save_graphs(save_path, graph=self.graphs[idx])
             logger.info(f"Graph saved to {save_path} for manual inspection.")
 
 
-def build_graph(dialog):
-    data = HeteroData()
-
-    node_idx = {
-        edu["speechturn"]: idx for idx, edu in enumerate(dialog["edus"])
-    }
-
-    embeddings, sentiments, speakers = extract_features(dialog["edus"])
-
-    data["edu"].x = torch.tensor(np.array(embeddings), dtype=torch.float)
-    data["edu"].sentiment = torch.tensor(sentiments, dtype=torch.float)
-
-    speaker_to_id = {s: i for i, s in enumerate(set(speakers))}
-    data["edu"].speaker = torch.tensor(
-        [speaker_to_id[s] for s in speakers], dtype=torch.long
-    )
-
-    edge_index = {}
-
-    for rel in dialog["relations"]:
-        src = node_idx.get(rel["x"])
-        dst = node_idx.get(rel["y"])
-        if src is not None and dst is not None:
-            if rel["type"] not in edge_index:
-                edge_index[rel["type"]] = []
-            edge_index[rel["type"]].append([src, dst])
-
-    for rel_type, edges in edge_index.items():
-        if edges:
-            data["edu", rel_type, "edu"].edge_index = (
-                torch.tensor(edges, dtype=torch.long).t().contiguous()
-            )
-
-    return data
+if __name__ == '__main__':
+    builder = GraphBuilder(dataset_path='../data/MOLWENI/test.json', dataset_name='MOLWENI')
+    builder()
