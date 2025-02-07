@@ -18,7 +18,7 @@ class DataCleaner:
     @staticmethod
     def clean_dataset(dataset_name, dataset):
         for entry in dataset:
-            # Remove 'speechturn' sub-attribute in STAC datasets
+            # Remove 'speechturn' sub-attribute in STAC dataset
             for edu in entry.get("edus", []):
                 if dataset_name in ["STAC_test", "STAC_train"]:
                     edu.pop("speechturn", None)

@@ -13,7 +13,7 @@ DATASETS = {
 }
 
 SENTIMENTS = {
-    'NEUTRAL': 0,
-    'POSITIVE': 1,
-    'NEGATIVE': -1
+    'NEU': 0,
+    'POS': 1,
+    'NEG': -1
 }

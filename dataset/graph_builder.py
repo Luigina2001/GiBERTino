@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # TODO: disable huggingface logger because this does not work
-transformers.utils.logging.set_verbosity_error()  # disable info and warning logging (progress bar and updates)
+# transformers.utils.logging.set_verbosity_error()  # disable info and warning logging (progress bar and updates)
 
 
 class GraphBuilder:
@@ -48,6 +48,7 @@ class GraphBuilder:
         self.dataset_path = dataset_path
         self.dataset_name = dataset_name
         self.sentence_model = SentenceTransformer(sentence_model)
+        logger.info(f"Load pretrained sentiment analysis model: {sentiment_model}.")
         self.sentiment_model = pipeline('sentiment-analysis', model=sentiment_model)
         self.graphs = []
 
@@ -67,7 +68,7 @@ class GraphBuilder:
 
             for edu_idx, edu in enumerate(dialog["edus"]):
                 text_embeddings.append(self.sentence_model.encode(edu["text"]))
-                sentiment = self.sentiment_model(edu["text"])[0]['label']
+                sentiment = self.sentiment_model(edu["text"])[0]['label'][:3].upper()
                 sentiment_labels.append(SENTIMENTS[sentiment])
 
                 if edu["speaker"] not in speakers:

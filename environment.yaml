@@ -48,7 +48,7 @@ dependencies:
   - contourpy=1.3.1=py310h48ca7d4_0
   - cycler=0.11.0=pyhd3eb1b0_0
   - cyrus-sasl=2.1.28=h9131b1a_1
-  - datasets=2.14.4=pyhd8ed1ab_0
+  - dataset=2.14.4=pyhd8ed1ab_0
   - debugpy=1.8.11=py310h313beb8_0
   - decorator=5.1.1=pyhd3eb1b0_0
   - defusedxml=0.7.1=pyhd3eb1b0_0
