@@ -1,5 +1,6 @@
 import json
 
+global final_global_relations
 
 def load_dataset(dataset_path):
     with open(dataset_path, "r", encoding="utf-8") as f:
@@ -32,47 +33,6 @@ def explore_features(dataset, dataset_name):
     relation_types = set()
     for entry in dataset:
         relation_types.update(rel["type"] for rel in entry["relations"])
-    print("\nUnique relationship types in the dataset:")
-    print(relation_types)
-
-
-import json
-
-
-def load_dataset(path):
-    with open(path, "r", encoding="utf-8") as f:
-        dataset = json.load(f)
-    return dataset
-
-
-def explore_features(dataset, dataset_name):
-    if not dataset:
-        print("Dataset is empty or invalid.")
-        return
-
-    # Print all available features in the dataset
-    keys = set()
-    for entry in dataset:
-        keys.update(entry.keys())
-    print(f"\nAvailable features in the dataset {dataset_name}: ")
-    print(keys)
-
-    sub_attributes = set()
-    for key in keys:
-        for entry in dataset:
-            if isinstance(entry.get(key), dict):
-                sub_attributes.update(entry[key].keys())
-            elif isinstance(entry.get(key), list) and entry[key] and isinstance(entry[key][0], dict):
-                for item in entry[key]:
-                    sub_attributes.update(item.keys())
-    print("Sub-attributes:", sub_attributes)
-
-    # Print all unique relationship types
-    relation_types = set()
-    for entry in dataset:
-        if "relations" in entry:
-            relation_types.update(rel["type"] for rel in entry["relations"])
-
     print("\nUnique relationship types in the dataset:")
     print(relation_types)
 
@@ -113,6 +73,7 @@ def compare_datasets(datasets):
     # Compare relationship types
     print("\nComparison of relationship types:")
     all_relations = set.union(*relation_sets.values())
+    final_global_relations.update(all_relations)
     for name, relations in relation_sets.items():
         missing_relations = all_relations - relations
         print(f"{name} is missing: {missing_relations}")
@@ -121,22 +82,25 @@ def compare_datasets(datasets):
 if __name__ == "__main__":
 
     dataset_paths = {
-        "TEST_133": "../data/MINECRAFT/TEST_133.json",
-        "TEST_101_bert": "../data/MINECRAFT/TEST_101_bert.json",
-        "DEV_32_bert": "../data/MINECRAFT/DEV_32_bert.json",
-        "TRAIN_307_bert": "../data/MINECRAFT/TRAIN_307_bert.json",
-        "VAL_100_bert": "../data/MINECRAFT/VAL_100_bert.json",
-        "MOLWENI_dev": "../data/MOLWENI/dev.json",
-        "MOLWENI_test": "../data/MOLWENI/test.json",
-        "MOLWENI_train": "../data/MOLWENI/train.json",
-        "STAC_test": "../data/STAC/test_subindex.json",
-        "STAC_train": "../data/STAC/train_subindex.json",
+        "TEST_133": "../../data/MINECRAFT/TEST_133.json",
+        "TEST_101_bert": "../../data/MINECRAFT/TEST_101_bert.json",
+        "DEV_32_bert": "../../data/MINECRAFT/DEV_32_bert.json",
+        "TRAIN_307_bert": "../../data/MINECRAFT/TRAIN_307_bert.json",
+        "VAL_100_bert": "../../data/MINECRAFT/VAL_100_bert.json",
+        "MOLWENI_dev": "../../data/MOLWENI/dev.json",
+        "MOLWENI_test": "../../data/MOLWENI/test.json",
+        "MOLWENI_train": "../../data/MOLWENI/train.json",
+        "STAC_test": "../../data/STAC/test_subindex.json",
+        "STAC_train": "../../data/STAC/train_subindex.json",
     }
 
     datasets = {}
+    final_global_relations = set()
     for name, path in dataset_paths.items():
         datasets[name] = load_dataset(path)
         explore_features(datasets[name], name)
 
     compare_datasets(datasets)
+    print(f"\n\n\n{final_global_relations}")
+    print(len(final_global_relations))
 
