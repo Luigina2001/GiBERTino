@@ -41,16 +41,25 @@ class GraphBuilder:
         """
         Build a heterogeneous graph from the dataset where edges represent relationships between EDUs.
         """
-        graph_data = HeteroData()
 
         logger.info(f"Starting graph construction for dataset {self.dataset_name}...")
         # Use tqdm to show progress for dialog processing
         for dialog in tqdm(self.dialogs, desc="Processing dialogs"):
+            graph_data = HeteroData()
             node_idxs = []
 
             for edu_idx in range(len(dialog["edus"])):
-                graph_data["edu"].x = torch.randn(len(dialog["edus"][edu_idx]), 1)
                 node_idxs.append(edu_idx)
+
+            embeddings, sentiments, speakers = extract_features(dialog["edus"])
+
+            speaker_to_id = [i for i, s in enumerate(set(speakers))]
+            node_ids = torch.tensor(np.array(speaker_to_id), dtype=torch.float)
+            text_embeddings = torch.tensor(np.array(embeddings), dtype=torch.float)
+            sentiment_labels = torch.tensor(sentiments, dtype=torch.float)
+
+            node_features = torch.cat([node_ids, text_embeddings, sentiment_labels], dim=-1)
+            graph_data["edu"].x = node_features
 
             for rel_idx in range(len(dialog["relations"])):
                 src = dialog["relations"][rel_idx]["x"]
@@ -60,6 +69,7 @@ class GraphBuilder:
                 graph_data["edu", rel_type, "edu"].edge_index = (torch.tensor([[src, dst]]).t().contiguous())
 
         self.graph = graph_data
+        print(dialog["id"])
         logger.info("Graph construction completed successfully.")
 
     def save_graph(self, path: str):

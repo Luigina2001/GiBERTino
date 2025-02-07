@@ -54,8 +54,10 @@ def extract_features(edu_list):
         text = process_text(edu["text"])
         speaker = edu["speaker"]
 
-        embedding = sequence_bert.forward([text]).numpy()
-        sentiment = get_sentiment(text)
+        # embedding = sequence_bert.forward([text]).numpy()
+        embedding = 0
+        # sentiment = get_sentiment(text)
+        sentiment = 100
 
         embeddings.append(embedding)
         sentiments.append(sentiment)
