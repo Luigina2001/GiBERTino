@@ -1,3 +1,4 @@
+import numpy as np
 from utils import load_dataset
 from collections import defaultdict
 global final_global_relations
@@ -88,11 +89,34 @@ def compare_datasets(datasets): # noqa
         print(f"{name} is missing: {missing_relations}")
 
     # Print the relationship counts for each dataset
-    print("\nRelationship counts per dataset:")
-    for name, counts in relation_counts.items(): # noqa
+    print("\n" + "=" * 30 + " RELATIONSHIP COUNTS PER DATASET " + "=" * 30 + "\n")
+
+    for name, counts in relation_counts.items():  # noqa
+        total_counts = []
+        tot = 0
         print(f"\n{name} relationship counts:")
         for relation, count in counts.items():
+            total_counts.append(count)
+            tot += count
             print(f"  {relation}: {count}")
+        mean_val = np.mean(total_counts)
+        std_val = np.std(total_counts)
+        percentile = np.percentile(total_counts, 25)
+
+        print("\n" + "-" * 80)
+        print(f"TOTAL RELATIONSHIPS: {tot}")
+        print(f"MEAN COUNT: {mean_val:.2f}")
+        print(f"STANDARD DEVIATION: {std_val:.2f}")
+        print(f"25° PERCENTILE: {percentile:.2f}")
+
+        print(f"\nFor {name} the relationships below the {percentile} threshold are:")
+        for relation, count in counts.items():
+            if count < percentile:
+                print(f" {relation}: {count}")
+
+        print("-" * 80)
+        print("\n")
+
 
 
 if __name__ == "__main__":
@@ -126,8 +150,7 @@ if __name__ == "__main__":
     print(f"\n\n\n{final_global_relations}")
     print(len(final_global_relations))
 
-
-    print("\n\n--------------------------------------------------------\n\n")
+    print("\n\n" + "=" * 60 + " MERGED DATASETS " + "=" * 60 + "\n\n")
 
     datasets = {}
     final_global_relations = set()
