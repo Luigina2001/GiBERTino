@@ -1,24 +1,17 @@
 import logging
 import os
-import random
 from collections import defaultdict
-
-import numpy as np
 from typing import Literal, Optional, Union, List
 
-import matplotlib.colors as mcolors
-import matplotlib.patches as mpatches
-import networkx as nx
+import numpy as np
 import torch
-from matplotlib import pyplot as plt
 from sentence_transformers import SentenceTransformer
 from torch_geometric.data import HeteroData
-from torch_geometric.utils.convert import to_networkx
 from tqdm import tqdm
 from transformers import pipeline
-import transformers.utils.logging
+from transformers.utils.logging import set_verbosity_error
 
-from utils import load_dataset
+from utils import load_dataset, display_graph
 from utils.constants import SENTIMENTS
 
 logging.basicConfig(
@@ -27,7 +20,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # TODO: disable huggingface logger because this does not work
-# transformers.utils.logging.set_verbosity_error()  # disable info and warning logging (progress bar and updates)
 
 
 class GraphBuilder:
@@ -82,6 +74,7 @@ class GraphBuilder:
             "sentiment-analysis", model=sentiment_model
         )
         self.graphs = []
+        set_verbosity_error()  # disable info and warning logging (progress bar and updates)
 
     def __call__(self):
         """
@@ -100,7 +93,7 @@ class GraphBuilder:
             speakers_ids = []
 
             for edu_idx, edu in enumerate(dialog["edus"]):
-                text_embeddings.append(self.sentence_model.encode(edu["text"]))
+                text_embeddings.append(self.sentence_model.encode(edu["text"], show_progress_bar=False))
                 sentiment = self.sentiment_model(edu["text"])[0]["label"][
                     :3
                 ].upper()
@@ -192,72 +185,4 @@ class GraphBuilder:
             )
             return
 
-        try:
-            # Convert the graph to a NetworkX graph for visualization
-            G = to_networkx(self.graphs[idx])
-
-            plt.figure(figsize=(10, 8))
-            pos = nx.spring_layout(
-                G, seed=42
-            )  # Layout for consistent visualization
-
-            # Get unique edge types
-            edge_types = set(
-                data["type"][1] for _, _, data in G.edges(data=True)
-            )
-            colors = list(mcolors.TABLEAU_COLORS.values())
-            random.shuffle(colors)  # Shuffle to assign unique colors
-            color_map = {
-                etype: colors[i % len(colors)]
-                for i, etype in enumerate(edge_types)
-            }
-
-            # Draw edges with unique colors based on relation type
-            legend_handles = []
-            for edge_type in edge_types:
-                edges = [
-                    (u, v)
-                    for u, v, data in G.edges(data=True)
-                    if data["type"][1] == edge_type
-                ]
-                nx.draw_networkx_edges(
-                    G,
-                    pos,
-                    edgelist=edges,
-                    edge_color=color_map[edge_type],
-                    width=2,
-                    alpha=0.7,
-                    label=edge_type,
-                )
-                legend_handles.append(
-                    mpatches.Patch(color=color_map[edge_type], label=edge_type)
-                )
-
-            # Draw nodes
-            nx.draw_networkx_nodes(
-                G,
-                pos,
-                node_size=300,
-                node_color="lightblue",
-                edgecolors="black",
-            )
-            nx.draw_networkx_labels(G, pos, font_size=10, font_color="black")
-
-            plt.legend(
-                handles=legend_handles,
-                title="Edge Types",
-                loc="upper right",
-                bbox_to_anchor=(1, 1),
-            )
-            plt.title(f"Graph Visualization: {self.dataset_names}")
-            plt.show()
-
-        except Exception as e:
-            logger.warning(
-                f"Graph display failed: {e}. Saving graph to a file instead."
-            )
-            save_path = os.path.join(
-                os.getcwd(), f"{self.dataset_names}_graph_{idx}.pth"
-            )
-            self.save_graphs(save_path, graph=self.graphs[idx])
-            logger.info(f"Graph saved to {save_path} for manual inspection.")
+        return display_graph(self.graphs[idx], "-".join(self.dataset_names))
