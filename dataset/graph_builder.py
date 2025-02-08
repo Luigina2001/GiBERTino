@@ -4,7 +4,7 @@ import random
 from collections import defaultdict
 
 import numpy as np
-from typing import Literal, Optional
+from typing import Literal, Optional, Union, List
 
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
@@ -31,32 +31,65 @@ logger = logging.getLogger(__name__)
 
 
 class GraphBuilder:
-    def __init__(self, dataset_path: str, dataset_name: Literal['MOLWENI', 'STAC', 'MINECRAFT'],
-                 sentence_model: str = 'Alibaba-NLP/gte-modernbert-base',
-                 sentiment_model: str = 'finiteautomata/bertweet-base-sentiment-analysis'):
+    def __init__(
+        self,
+        dataset_paths: Union[List[str], str],
+        dataset_names: Union[
+            Literal["MOLWENI", "STAC", "MINECRAFT"],
+            List[Literal["MOLWENI", "STAC", "MINECRAFT"]],
+        ],
+        dataset_type: str = Literal["test", "train", "val", "dev"],
+        sentence_model: str = "Alibaba-NLP/gte-modernbert-base",
+        sentiment_model: str = "finiteautomata/bertweet-base-sentiment-analysis",
+    ):
         """
         Initialize the GraphBuilder with the dataset path and name.
 
         Args:
-            dataset_path (str): Path to the dataset.
-            dataset_name (Literal['MOLWENI', 'STAC', 'MINECRAFT']): Name of the dataset.
+            dataset_paths (Union[List[str], str]): Path(s) to the dataset(s).
+            dataset_names (Union[Literal['MOLWENI', 'STAC', 'MINECRAFT'], List[Literal['MOLWENI', 'STAC', 'MINECRAFT']]]): Name(s) of the dataset(s).
+            dataset_type (Literal['test', 'train', 'val', 'dev']): Type of dataset.
+            sentence_model (str): Name of the sentence embedding model.
+            sentiment_model (str): Name of the sentiment analysis model.
         """
-        logger.info(f"Loading dataset from {dataset_path}")
-        self.dialogs = load_dataset(dataset_path)
-        logger.info(f"{dataset_name} dataset loaded successfully.")
+        # Ensure dataset_paths and dataset_names are lists
+        if isinstance(dataset_paths, str):
+            dataset_paths = [dataset_paths]
+        if isinstance(dataset_names, str):
+            dataset_names = [dataset_names]
 
-        self.dataset_path = dataset_path
-        self.dataset_name = dataset_name
+        if len(dataset_paths) != len(dataset_names):
+            raise ValueError(
+                "The number of dataset paths must match the number of dataset names."
+            )
+
+        self.dataset_paths = dataset_paths
+        self.dataset_names = dataset_names
+        self.dataset_type = dataset_type
+        self.dialogs = []
+
+        # Load each dataset
+        for path, name in zip(dataset_paths, dataset_names):
+            logger.info(f"Loading dataset from {path}")
+            self.dialogs.extend(load_dataset(path))
+            logger.info(f"{name} dataset loaded successfully.")
+            
         self.sentence_model = SentenceTransformer(sentence_model)
-        logger.info(f"Load pretrained sentiment analysis model: {sentiment_model}.")
-        self.sentiment_model = pipeline('sentiment-analysis', model=sentiment_model)
+        logger.info(
+            f"Load pretrained sentiment analysis model: {sentiment_model}."
+        )
+        self.sentiment_model = pipeline(
+            "sentiment-analysis", model=sentiment_model
+        )
         self.graphs = []
 
     def __call__(self):
         """
         Build a heterogeneous graph from the dataset where edges represent relationships between EDUs.
         """
-        logger.info(f"Starting graph construction for dataset {self.dataset_name}...")
+        logger.info(
+            f"Starting graph construction for dataset/s {self.dataset_names}..."
+        )
 
         for dialog in tqdm(self.dialogs, desc="Processing dialogs"):
             graph_data = HeteroData()
@@ -68,7 +101,9 @@ class GraphBuilder:
 
             for edu_idx, edu in enumerate(dialog["edus"]):
                 text_embeddings.append(self.sentence_model.encode(edu["text"]))
-                sentiment = self.sentiment_model(edu["text"])[0]['label'][:3].upper()
+                sentiment = self.sentiment_model(edu["text"])[0]["label"][
+                    :3
+                ].upper()
                 sentiment_labels.append(SENTIMENTS[sentiment])
 
                 if edu["speaker"] not in speakers:
@@ -78,15 +113,25 @@ class GraphBuilder:
                 node_idxs.append(edu_idx)
 
             embeddings_dim = text_embeddings[0].shape[-1]
-            text_embeddings = torch.tensor(np.array(text_embeddings), dtype=torch.double)
-            sentiment_labels = torch.tensor(np.array(sentiment_labels), dtype=torch.int8)
-            speakers_ids = torch.tensor(np.array(speakers_ids), dtype=torch.int8)
+            text_embeddings = torch.tensor(
+                np.array(text_embeddings), dtype=torch.double
+            )
+            sentiment_labels = torch.tensor(
+                np.array(sentiment_labels), dtype=torch.int8
+            )
+            speakers_ids = torch.tensor(
+                np.array(speakers_ids), dtype=torch.int8
+            )
 
             # match dim 1
-            sentiment_labels = sentiment_labels.unsqueeze(1).repeat(1, embeddings_dim)
+            sentiment_labels = sentiment_labels.unsqueeze(1).repeat(
+                1, embeddings_dim
+            )
             speakers_ids = speakers_ids.unsqueeze(1).repeat(1, embeddings_dim)
 
-            node_features = torch.cat([text_embeddings, sentiment_labels, speakers_ids], dim=-1)
+            node_features = torch.cat(
+                [text_embeddings, sentiment_labels, speakers_ids], dim=-1
+            )
 
             graph_data["edu"].x = node_features
 
@@ -100,14 +145,16 @@ class GraphBuilder:
                 edge_dict[rel_type].append((src, dst))
 
             for rel_type, edges in edge_dict.items():
-                edge_tensor = torch.tensor(edges, dtype=torch.long).t().contiguous()
+                edge_tensor = (
+                    torch.tensor(edges, dtype=torch.long).t().contiguous()
+                )
                 graph_data["edu", rel_type, "edu"].edge_index = edge_tensor
 
             self.graphs.append(graph_data)
 
         logger.info("Graph construction completed successfully.")
 
-    def save_graphs(self, path: str, graph: Optional[HeteroData]):
+    def save_graphs(self, path: str, graph: Optional[HeteroData] = None):
         """
         Save the constructed graph to a file.
 
@@ -116,21 +163,20 @@ class GraphBuilder:
             graph: Specific graph to save. Optional.
         """
         if len(self.graphs) == 0 and graph is None:
-            logger.warning("No graph to save. Please run the graph construction first.")
+            logger.warning(
+                "No graph to save. Please run the graph construction first."
+            )
             return
-
-        if graph is None and not os.path.isdir(path):
-            logger.warning("Path is not a directory. Please specify a directory")
-            return
-
+        
+        path = os.path.join(path, self.dataset_type)
         logger.info(f"Saving graphs to {path}")
 
         if graph is None:
             os.makedirs(path, exist_ok=True)
 
             for idx, graph in enumerate(self.graphs):
-                graph_path = os.path.join(path, str(idx))
-                torch.save(graph, os.path.join(graph_path, ".pt"))
+                graph_path = os.path.join(path, f"{str(idx)}.pt")
+                torch.save(graph, graph_path)
         else:
             torch.save(graph, path)
         logger.info("Graphs saved successfully.")
@@ -141,7 +187,9 @@ class GraphBuilder:
         save the graph to a file and log the path.
         """
         if len(self.graphs) == 0:
-            logger.warning("No graph to display. Please run the graph construction first.")
+            logger.warning(
+                "No graph to display. Please run the graph construction first."
+            )
             return
 
         try:
@@ -149,37 +197,67 @@ class GraphBuilder:
             G = to_networkx(self.graphs[idx])
 
             plt.figure(figsize=(10, 8))
-            pos = nx.spring_layout(G, seed=42)  # Layout for consistent visualization
+            pos = nx.spring_layout(
+                G, seed=42
+            )  # Layout for consistent visualization
 
             # Get unique edge types
-            edge_types = set(data['type'][1] for _, _, data in G.edges(data=True))
+            edge_types = set(
+                data["type"][1] for _, _, data in G.edges(data=True)
+            )
             colors = list(mcolors.TABLEAU_COLORS.values())
             random.shuffle(colors)  # Shuffle to assign unique colors
-            color_map = {etype: colors[i % len(colors)] for i, etype in enumerate(edge_types)}
+            color_map = {
+                etype: colors[i % len(colors)]
+                for i, etype in enumerate(edge_types)
+            }
 
             # Draw edges with unique colors based on relation type
             legend_handles = []
             for edge_type in edge_types:
-                edges = [(u, v) for u, v, data in G.edges(data=True) if data['type'][1] == edge_type]
-                nx.draw_networkx_edges(G, pos, edgelist=edges, edge_color=color_map[edge_type], width=2, alpha=0.7,
-                                       label=edge_type)
-                legend_handles.append(mpatches.Patch(color=color_map[edge_type], label=edge_type))
+                edges = [
+                    (u, v)
+                    for u, v, data in G.edges(data=True)
+                    if data["type"][1] == edge_type
+                ]
+                nx.draw_networkx_edges(
+                    G,
+                    pos,
+                    edgelist=edges,
+                    edge_color=color_map[edge_type],
+                    width=2,
+                    alpha=0.7,
+                    label=edge_type,
+                )
+                legend_handles.append(
+                    mpatches.Patch(color=color_map[edge_type], label=edge_type)
+                )
 
             # Draw nodes
-            nx.draw_networkx_nodes(G, pos, node_size=300, node_color='lightblue', edgecolors='black')
-            nx.draw_networkx_labels(G, pos, font_size=10, font_color='black')
+            nx.draw_networkx_nodes(
+                G,
+                pos,
+                node_size=300,
+                node_color="lightblue",
+                edgecolors="black",
+            )
+            nx.draw_networkx_labels(G, pos, font_size=10, font_color="black")
 
-            plt.legend(handles=legend_handles, title="Edge Types", loc="upper right", bbox_to_anchor=(1, 1))
-            plt.title(f"Graph Visualization: {self.dataset_name}")
+            plt.legend(
+                handles=legend_handles,
+                title="Edge Types",
+                loc="upper right",
+                bbox_to_anchor=(1, 1),
+            )
+            plt.title(f"Graph Visualization: {self.dataset_names}")
             plt.show()
 
         except Exception as e:
-            logger.warning(f"Graph display failed: {e}. Saving graph to a file instead.")
-            save_path = os.path.join(os.getcwd(), f"{self.dataset_name}_graph.pth")
+            logger.warning(
+                f"Graph display failed: {e}. Saving graph to a file instead."
+            )
+            save_path = os.path.join(
+                os.getcwd(), f"{self.dataset_names}_graph_{idx}.pth"
+            )
             self.save_graphs(save_path, graph=self.graphs[idx])
             logger.info(f"Graph saved to {save_path} for manual inspection.")
-
-
-if __name__ == '__main__':
-    builder = GraphBuilder(dataset_path='../data/MOLWENI/test.json', dataset_name='MOLWENI')
-    builder()
