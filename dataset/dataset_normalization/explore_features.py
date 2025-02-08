@@ -1,4 +1,5 @@
 from utils import load_dataset
+from collections import defaultdict
 global final_global_relations
 
 
@@ -31,16 +32,30 @@ def explore_features(dataset, dataset_name):
     print(relation_types)
 
 
+def count_relationships(dataset):
+    relation_counts = defaultdict(int)
+
+    for entry in dataset:
+        if "relations" in entry:
+            for rel in entry["relations"]:
+                relation_counts[rel["type"]] += 1
+    return relation_counts
+
+
+
 def compare_datasets(datasets): # noqa
     feature_sets = {name: set() for name in datasets} # noqa
     relation_sets = {name: set() for name in datasets} # noqa
-    sub_attribute_sets = {name: set() for name in datasets}
+    sub_attribute_sets = {name: set() for name in datasets} # noqa
+    relation_counts = {name: defaultdict(int) for name in datasets} # noqa
 
     for name, dataset in datasets.items(): # noqa
         for entry in dataset:
             feature_sets[name].update(entry.keys())
             if "relations" in entry:
                 relation_sets[name].update(rel["type"] for rel in entry["relations"])
+                for rel in entry["relations"]:
+                    relation_counts[name][rel["type"]] += 1
             for key in entry.keys():
                 if isinstance(entry.get(key), dict):
                     sub_attribute_sets[name].update(entry[key].keys())
@@ -72,6 +87,13 @@ def compare_datasets(datasets): # noqa
         missing_relations = all_relations - relations
         print(f"{name} is missing: {missing_relations}")
 
+    # Print the relationship counts for each dataset
+    print("\nRelationship counts per dataset:")
+    for name, counts in relation_counts.items(): # noqa
+        print(f"\n{name} relationship counts:")
+        for relation, count in counts.items():
+            print(f"  {relation}: {count}")
+
 
 if __name__ == "__main__":
 
@@ -88,6 +110,12 @@ if __name__ == "__main__":
         "STAC_train": "../../data/STAC/train_subindex.json",
     }
 
+    merged_datasets = {
+        "TRAIN": "../../data/MERGED/train.json",
+        "VAL": "../../data/MERGED/val.json",
+        "TEST": "../../data/MERGED/test.json"
+    }
+
     datasets = {}
     final_global_relations = set()
     for name, path in dataset_paths.items():
@@ -98,3 +126,15 @@ if __name__ == "__main__":
     print(f"\n\n\n{final_global_relations}")
     print(len(final_global_relations))
 
+
+    print("\n\n--------------------------------------------------------\n\n")
+
+    datasets = {}
+    final_global_relations = set()
+    for name, path in merged_datasets.items():
+        datasets[name] = load_dataset(path)
+        explore_features(datasets[name], name)
+
+    compare_datasets(datasets)
+    print(f"\n\n\n{final_global_relations}")
+    print(len(final_global_relations))

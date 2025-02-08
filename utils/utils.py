@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import logging
 from typing import Optional
@@ -20,6 +21,11 @@ def load_dataset(file_path: str):
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return data
+
+
+def save_dataset(dataset, path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(dataset, f, indent=4)
 
 
 def display_graph(graph: HeteroData, dataset_name: Optional[str] = None):

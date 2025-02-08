@@ -1,19 +1,9 @@
-import json
+from utils import load_dataset, save_dataset
 
 
 class DataCleaner:
     def __init__(self, dataset_paths): # noqa
         self.dataset_paths = dataset_paths
-
-    @staticmethod
-    def load_dataset(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    @staticmethod
-    def save_dataset(path, dataset):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(dataset, f, indent=4, ensure_ascii=False)
 
     @staticmethod
     def clean_dataset(dataset_name, dataset):
@@ -34,9 +24,9 @@ class DataCleaner:
     def process_datasets(self):
         for name, path in self.dataset_paths.items():
             print(f"Processing {name}...")
-            dataset = self.load_dataset(path)
+            dataset = load_dataset(path)
             self.clean_dataset(name, dataset)
-            self.save_dataset(path, dataset)
+            save_dataset(path, dataset)
         print("Data cleaning completed!")
 
 
