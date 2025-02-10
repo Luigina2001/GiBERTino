@@ -25,7 +25,7 @@ class GraphBuilder:
             self,
             dataset_paths: Union[List[str], str],
             dataset_names: Union[str, List[str]],
-            dataset_type: str = Literal["test", "train", "val", "dev"],
+            dataset_type: Literal["test", "train", "val"],
             sentence_model: str = "Alibaba-NLP/gte-modernbert-base",
             sentiment_model: str = "finiteautomata/bertweet-base-sentiment-analysis",
     ):

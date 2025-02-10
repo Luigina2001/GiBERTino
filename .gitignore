@@ -1,6 +1,7 @@
 data
 pyrightconfig.json
 
+.conda
 .ipynb_checkpoints
 
 # Byte-compiled / optimized / DLL files
