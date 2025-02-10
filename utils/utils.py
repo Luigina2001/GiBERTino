@@ -88,17 +88,10 @@ def display_graph(graph: HeteroData, dataset_name: Optional[str] = None):
         )
         title = "Graph Visualization"
         if dataset_name is not None:
-            title += ": {dataset_name}"
+            title += f": {dataset_name}"
 
         plt.title(title)
         plt.show()
 
     except Exception as e:
-        logger.warning(
-            f"Graph display failed: {e}. Saving graph to a file instead."
-        )
-        save_path = os.path.join(
-            os.getcwd(), f"{self.dataset_names}_graph_{idx}.pth"
-        )
-        self.save_graphs(save_path, graph=self.graphs[idx])
-        logger.info(f"Graph saved to {save_path} for manual inspection.")
+        logger.warning(f"Failed to display graph: {e}.")

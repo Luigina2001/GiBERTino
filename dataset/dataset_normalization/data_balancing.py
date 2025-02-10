@@ -1,11 +1,13 @@
+import json
+
 from utils import load_dataset, save_dataset
 import os
 
 
 class DataBalancer:
-    def __init__(self, dataset_paths): # noqa
+    def __init__(self, dataset_paths, output_dir: str): # noqa
         self.dataset_paths = dataset_paths
-        self.output_dir = "../../data/BALANCED/"
+        self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
     @staticmethod
@@ -40,11 +42,22 @@ class DataBalancer:
 
 
 if __name__ == "__main__":
-    dataset_paths = {
-        "TRAIN": "../../data/MERGED/train.json",
-        "VAL": "../../data/MERGED/val.json",
-        "TEST": "../../data/MERGED/test.json"
-    }
+    # dataset_paths = {
+    #     "TRAIN": "../../data/MERGED/train.json",
+    #     "VAL": "../../data/MERGED/val.json",
+    #     "TEST": "../../data/MERGED/test.json"
+    # }
+    #
+    # balancer = DataBalancer(dataset_paths, "../../data/BALANCED/")
+    # balancer.process_datasets()
+    with open("../../data/MOLWENI/train.json", "r") as f:
+        train_data = json.load(f)
 
-    balancer = DataBalancer(dataset_paths)
-    balancer.process_datasets()
+    with open("../../data/BALANCED/test.json", "r") as f:
+        test_data = json.load(f)
+
+    with open("../../data/MOLWENI/test.json", "r") as f:
+        val_data = json.load(f)
+
+    print(f"train data: {len(train_data)} - val data: {len(val_data)} - test data: {len(test_data)}")
+

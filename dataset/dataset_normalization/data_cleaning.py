@@ -26,7 +26,7 @@ class DataCleaner:
             print(f"Processing {name}...")
             dataset = load_dataset(path)
             self.clean_dataset(name, dataset)
-            save_dataset(path, dataset)
+            save_dataset(dataset, path)
         print("Data cleaning completed!")
 
 

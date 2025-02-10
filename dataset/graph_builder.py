@@ -1,9 +1,9 @@
 import logging
 import os
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Literal, Optional, Union, List
 
-import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 from torch_geometric.data import HeteroData
@@ -19,27 +19,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# TODO: disable huggingface logger because this does not work
-
 
 class GraphBuilder:
     def __init__(
-        self,
-        dataset_paths: Union[List[str], str],
-        dataset_names: Union[
-            Literal["MOLWENI", "STAC", "MINECRAFT"],
-            List[Literal["MOLWENI", "STAC", "MINECRAFT"]],
-        ],
-        dataset_type: str = Literal["test", "train", "val", "dev"],
-        sentence_model: str = "Alibaba-NLP/gte-modernbert-base",
-        sentiment_model: str = "finiteautomata/bertweet-base-sentiment-analysis",
+            self,
+            dataset_paths: Union[List[str], str],
+            dataset_names: Union[str, List[str]],
+            dataset_type: str = Literal["test", "train", "val", "dev"],
+            sentence_model: str = "Alibaba-NLP/gte-modernbert-base",
+            sentiment_model: str = "finiteautomata/bertweet-base-sentiment-analysis",
     ):
         """
         Initialize the GraphBuilder with the dataset path and name.
 
         Args:
             dataset_paths (Union[List[str], str]): Path(s) to the dataset(s).
-            dataset_names (Union[Literal['MOLWENI', 'STAC', 'MINECRAFT'], List[Literal['MOLWENI', 'STAC', 'MINECRAFT']]]): Name(s) of the dataset(s).
+            dataset_names (Union[str, List[str]]): Name(s) of the dataset(s).
             dataset_type (Literal['test', 'train', 'val', 'dev']): Type of dataset.
             sentence_model (str): Name of the sentence embedding model.
             sentiment_model (str): Name of the sentiment analysis model.
@@ -59,20 +54,18 @@ class GraphBuilder:
         self.dataset_names = dataset_names
         self.dataset_type = dataset_type
         self.dialogs = []
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 
         # Load each dataset
         for path, name in zip(dataset_paths, dataset_names):
             logger.info(f"Loading dataset from {path}")
             self.dialogs.extend(load_dataset(path))
             logger.info(f"{name} dataset loaded successfully.")
-            
-        self.sentence_model = SentenceTransformer(sentence_model)
-        logger.info(
-            f"Load pretrained sentiment analysis model: {sentiment_model}."
-        )
-        self.sentiment_model = pipeline(
-            "sentiment-analysis", model=sentiment_model
-        )
+
+        self.sentence_model = SentenceTransformer(sentence_model).to(self.device)
+        logger.info(f"Load pretrained sentiment analysis model: {sentiment_model}.")
+        self.sentiment_model = pipeline("sentiment-analysis", model=sentiment_model, device=self.device)
         self.graphs = []
         set_verbosity_error()  # disable info and warning logging (progress bar and updates)
 
@@ -86,62 +79,49 @@ class GraphBuilder:
 
         for dialog in tqdm(self.dialogs, desc="Processing dialogs"):
             graph_data = HeteroData()
-            node_idxs = []
-            text_embeddings = []
-            sentiment_labels = []
             speakers = {}
             speakers_ids = []
 
-            for edu_idx, edu in enumerate(dialog["edus"]):
-                text_embeddings.append(self.sentence_model.encode(edu["text"], show_progress_bar=False))
-                sentiment = self.sentiment_model(edu["text"])[0]["label"][
-                    :3
-                ].upper()
-                sentiment_labels.append(SENTIMENTS[sentiment])
+            edus = [edu["text"] for edu in dialog["edus"]]
+            speakers_list = [edu["speaker"] for edu in dialog["edus"]]
 
-                if edu["speaker"] not in speakers:
-                    speakers[edu["speaker"]] = len(speakers)
+            torch.mps.empty_cache()
 
-                speakers_ids.append(speakers[edu["speaker"]])
-                node_idxs.append(edu_idx)
+            with ThreadPoolExecutor() as executor:
+                embeddings_future = executor.submit(
+                    lambda: self.sentence_model.encode(edus, batch_size=8, convert_to_tensor=True,
+                                                       show_progress_bar=False)
+                )
+                sentiments_future = executor.submit(lambda: self.sentiment_model(edus, batch_size=8))
 
-            embeddings_dim = text_embeddings[0].shape[-1]
-            text_embeddings = torch.tensor(
-                np.array(text_embeddings), dtype=torch.double
-            )
-            sentiment_labels = torch.tensor(
-                np.array(sentiment_labels), dtype=torch.int8
-            )
-            speakers_ids = torch.tensor(
-                np.array(speakers_ids), dtype=torch.int8
-            )
+                text_embeddings = embeddings_future.result().to(self.device)
+                sentiment_labels = torch.tensor(
+                    [SENTIMENTS[result["label"][:3].upper()] for result in sentiments_future.result()],
+                    dtype=torch.int8, device=self.device
+                )
 
-            # match dim 1
-            sentiment_labels = sentiment_labels.unsqueeze(1).repeat(
-                1, embeddings_dim
-            )
-            speakers_ids = speakers_ids.unsqueeze(1).repeat(1, embeddings_dim)
+            for speaker in speakers_list:
+                if speaker not in speakers:
+                    speakers[speaker] = len(speakers)
+                speakers_ids.append(speakers[speaker])
 
-            node_features = torch.cat(
-                [text_embeddings, sentiment_labels, speakers_ids], dim=-1
-            )
+            speakers_ids = torch.tensor(speakers_ids, dtype=torch.int8, device=self.device)
+            sentiment_labels = sentiment_labels.unsqueeze(1).repeat(1, text_embeddings.shape[-1])
+            speakers_ids = speakers_ids.unsqueeze(1).repeat(1, text_embeddings.shape[-1])
 
+            node_features = torch.cat([text_embeddings, sentiment_labels, speakers_ids], dim=-1)
             graph_data["edu"].x = node_features
+
+            torch.mps.empty_cache()
 
             edge_dict = defaultdict(list)
 
-            for rel_idx in range(len(dialog["relations"])):
-                src = dialog["relations"][rel_idx]["x"]
-                dst = dialog["relations"][rel_idx]["y"]
-                rel_type = dialog["relations"][rel_idx]["type"]
-
-                edge_dict[rel_type].append((src, dst))
+            for relation in dialog["relations"]:
+                edge_dict[relation["type"]].append((relation["x"], relation["y"]))
 
             for rel_type, edges in edge_dict.items():
-                edge_tensor = (
-                    torch.tensor(edges, dtype=torch.long).t().contiguous()
-                )
-                graph_data["edu", rel_type, "edu"].edge_index = edge_tensor
+                graph_data["edu", rel_type, "edu"].edge_index = torch.tensor(edges, dtype=torch.long,
+                                                                             device=self.device).t().contiguous()
 
             self.graphs.append(graph_data)
 
@@ -160,7 +140,7 @@ class GraphBuilder:
                 "No graph to save. Please run the graph construction first."
             )
             return
-        
+
         path = os.path.join(path, self.dataset_type)
         logger.info(f"Saving graphs to {path}")
 
