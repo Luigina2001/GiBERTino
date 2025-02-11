@@ -24,7 +24,6 @@ class DialogueGraphDataset(Dataset):
     def __len__(self):
         return len(self.graph_files)
 
-
     def __getitem__(self, index: int) -> Dict[str, Any]:
 
         graph_path = os.path.join(self.root, self.graph_files[index])
@@ -48,7 +47,7 @@ class DialogueGraphDataset(Dataset):
             "relation_labels": relation_labels
         }
 
-    def _generate_labels(self, graph: HeteroData, relation_types: List[tuple]) -> Tuple[torch.tensor, torch.tensor]:
+    def _generate_labels(self, graph: HeteroData, relation_types: List[str]) -> Tuple[torch.tensor, torch.tensor]:
         num_nodes = graph["edu"].x.size(0)
 
         # Link prediction labels
@@ -77,4 +76,3 @@ class DialogueGraphDataset(Dataset):
             raise ValueError(f"Unknown relation type: {edge_type}")
 
         return edge_types.index(edge_type)
-

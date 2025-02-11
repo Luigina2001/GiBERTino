@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 from collections import defaultdict
@@ -11,6 +12,7 @@ from tqdm import tqdm
 from transformers import pipeline
 from transformers.utils.logging import set_verbosity_error
 
+from transformations import BackTranslation
 from utils import load_dataset, display_graph
 from utils.constants import SENTIMENTS
 
@@ -18,6 +20,8 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+BATCH_SIZE = 8
 
 
 class GraphBuilder:
@@ -28,6 +32,10 @@ class GraphBuilder:
             dataset_type: Literal["test", "train", "val"],
             sentence_model: str = "Alibaba-NLP/gte-modernbert-base",
             sentiment_model: str = "finiteautomata/bertweet-base-sentiment-analysis",
+            src_translator: str = "Helsinki-NLP/opus-mt-en-ROMANCE",
+            tgt_translator: str = "Helsinki-NLP/opus-mt-ROMANCE-en",
+            p: float = 0.5,
+            augment_data: bool = True
     ):
         """
         Initialize the GraphBuilder with the dataset path and name.
@@ -63,42 +71,40 @@ class GraphBuilder:
             self.dialogs.extend(load_dataset(path))
             logger.info(f"{name} dataset loaded successfully.")
 
-        self.sentence_model = SentenceTransformer(sentence_model).to(self.device)
+        self.sentence_model = SentenceTransformer(sentence_model, device=str(self.device))
         logger.info(f"Load pretrained sentiment analysis model: {sentiment_model}.")
         self.sentiment_model = pipeline("sentiment-analysis", model=sentiment_model, device=self.device)
+
+        self.augment_data = augment_data
+        self.backtranslation = None
+
+        if self.augment_data and p > 0:
+            logger.info(f"Load backtranslation models: {src_translator} - {tgt_translator}.")
+            self.backtranslation = BackTranslation(src_translator=src_translator, tgt_translator=tgt_translator, p=p)
+
         self.graphs = []
         set_verbosity_error()  # disable info and warning logging (progress bar and updates)
 
-    def __call__(self):
-        """
-        Build a heterogeneous graph from the dataset where edges represent relationships between EDUs.
-        """
-        logger.info(
-            f"Starting graph construction for dataset/s {self.dataset_names}..."
-        )
+    def _process_graph(self, edus, speakers_list, relations):
+        graph_data = HeteroData()
+        speakers = {}
+        speakers_ids = []
 
-        for dialog in tqdm(self.dialogs, desc="Processing dialogs"):
-            graph_data = HeteroData()
-            speakers = {}
-            speakers_ids = []
+        with ThreadPoolExecutor() as executor:
+            embeddings_future = executor.submit(
+                lambda: self.sentence_model.encode(edus, batch_size=BATCH_SIZE, convert_to_tensor=True,
+                                                   show_progress_bar=False)
+            )
+            sentiments_future = executor.submit(lambda: self.sentiment_model(edus, batch_size=BATCH_SIZE))
 
-            edus = [edu["text"] for edu in dialog["edus"]]
-            speakers_list = [edu["speaker"] for edu in dialog["edus"]]
+            text_embeddings = embeddings_future.result().to(self.device)
+            sentiment_labels = torch.tensor(
+                [SENTIMENTS[result["label"][:3].upper()] for result in sentiments_future.result()],
+                dtype=torch.int8, device=self.device
+            )
 
-            torch.mps.empty_cache()
-
-            with ThreadPoolExecutor() as executor:
-                embeddings_future = executor.submit(
-                    lambda: self.sentence_model.encode(edus, batch_size=8, convert_to_tensor=True,
-                                                       show_progress_bar=False)
-                )
-                sentiments_future = executor.submit(lambda: self.sentiment_model(edus, batch_size=8))
-
-                text_embeddings = embeddings_future.result().to(self.device)
-                sentiment_labels = torch.tensor(
-                    [SENTIMENTS[result["label"][:3].upper()] for result in sentiments_future.result()],
-                    dtype=torch.int8, device=self.device
-                )
+            if str(self.device) != 'cpu':
+                getattr(torch, str(self.device)).empty_cache()
 
             for speaker in speakers_list:
                 if speaker not in speakers:
@@ -112,11 +118,12 @@ class GraphBuilder:
             node_features = torch.cat([text_embeddings, sentiment_labels, speakers_ids], dim=-1)
             graph_data["edu"].x = node_features
 
-            torch.mps.empty_cache()
+            if str(self.device) != 'cpu':
+                getattr(torch, str(self.device)).empty_cache()
 
             edge_dict = defaultdict(list)
 
-            for relation in dialog["relations"]:
+            for relation in relations:
                 edge_dict[relation["type"]].append((relation["x"], relation["y"]))
 
             for rel_type, edges in edge_dict.items():
@@ -124,6 +131,34 @@ class GraphBuilder:
                                                                              device=self.device).t().contiguous()
 
             self.graphs.append(graph_data)
+
+    def __call__(self):
+        """
+        Build a heterogeneous graph from the dataset where edges represent relationships between EDUs.
+        """
+        logger.info(
+            f"Starting graph construction for dataset/s {self.dataset_names}..."
+        )
+
+        for dialog in tqdm(self.dialogs, desc="Processing dialogs"):
+            augmented_edus = []
+            edus = []
+            speakers_list = []
+            augmented = False
+
+            for edu in dialog["edus"]:
+                edus.append(edu['text'])
+                speakers_list.append(edu['speaker'])
+
+                if self.backtranslation is not None:
+                    augmented_text = self.backtranslation(edu['text'])
+                    augmented_edus.append(augmented_text)
+                    augmented = augmented_text != edu['text']
+
+            if augmented:
+                self._process_graph(augmented_edus, speakers_list, dialog['relations'])
+
+            self._process_graph(edus, speakers_list, dialog['relations'])
 
         logger.info("Graph construction completed successfully.")
 
@@ -166,3 +201,8 @@ class GraphBuilder:
             return
 
         return display_graph(self.graphs[idx], "-".join(self.dataset_names))
+
+
+if __name__ == "__main__":
+    builder = GraphBuilder(dataset_paths='../data/STAC/test_subindex.json', dataset_names='AAA', dataset_type='test')
+    builder()
