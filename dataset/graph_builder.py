@@ -1,10 +1,9 @@
-import copy
 import logging
 import os
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from typing import Literal, Optional, Union, List
 
+import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 from torch_geometric.data import HeteroData
@@ -90,47 +89,44 @@ class GraphBuilder:
         speakers = {}
         speakers_ids = []
 
-        with ThreadPoolExecutor() as executor:
-            embeddings_future = executor.submit(
-                lambda: self.sentence_model.encode(edus, batch_size=BATCH_SIZE, convert_to_tensor=True,
-                                                   show_progress_bar=False)
-            )
-            sentiments_future = executor.submit(lambda: self.sentiment_model(edus, batch_size=BATCH_SIZE))
+        text_embeddings = self.sentence_model.encode(edus, batch_size=BATCH_SIZE, convert_to_tensor=True,
+                                                     show_progress_bar=False).to(self.device)
+        try:
+            sentiments = self.sentiment_model(edus, batch_size=BATCH_SIZE)
+        except IndexError:
+            sentiments = [{'label': 'NEU'} for _ in range(len(edus))]
 
-            text_embeddings = embeddings_future.result().to(self.device)
-            sentiment_labels = torch.tensor(
-                [SENTIMENTS[result["label"][:3].upper()] for result in sentiments_future.result()],
-                dtype=torch.int8, device=self.device
-            )
+        sentiment_labels = [SENTIMENTS[sentiment["label"][:3].upper()] for sentiment in sentiments]
+        sentiment_labels = torch.tensor(np.array(sentiment_labels), dtype=torch.int8, device=self.device)
 
-            if str(self.device) != 'cpu':
-                getattr(torch, str(self.device)).empty_cache()
+        if str(self.device) != 'cpu':
+            getattr(torch, str(self.device)).empty_cache()
 
-            for speaker in speakers_list:
-                if speaker not in speakers:
-                    speakers[speaker] = len(speakers)
-                speakers_ids.append(speakers[speaker])
+        for speaker in speakers_list:
+            if speaker not in speakers:
+                speakers[speaker] = len(speakers)
+            speakers_ids.append(speakers[speaker])
 
-            speakers_ids = torch.tensor(speakers_ids, dtype=torch.int8, device=self.device)
-            sentiment_labels = sentiment_labels.unsqueeze(1).repeat(1, text_embeddings.shape[-1])
-            speakers_ids = speakers_ids.unsqueeze(1).repeat(1, text_embeddings.shape[-1])
+        speakers_ids = torch.tensor(speakers_ids, dtype=torch.int8, device=self.device)
+        sentiment_labels = sentiment_labels.unsqueeze(1).repeat(1, text_embeddings.shape[-1])
+        speakers_ids = speakers_ids.unsqueeze(1).repeat(1, text_embeddings.shape[-1])
 
-            node_features = torch.cat([text_embeddings, sentiment_labels, speakers_ids], dim=-1)
-            graph_data["edu"].x = node_features
+        node_features = torch.cat([text_embeddings, sentiment_labels, speakers_ids], dim=-1)
+        graph_data["edu"].x = node_features
 
-            if str(self.device) != 'cpu':
-                getattr(torch, str(self.device)).empty_cache()
+        if str(self.device) != 'cpu':
+            getattr(torch, str(self.device)).empty_cache()
 
-            edge_dict = defaultdict(list)
+        edge_dict = defaultdict(list)
 
-            for relation in relations:
-                edge_dict[relation["type"]].append((relation["x"], relation["y"]))
+        for relation in relations:
+            edge_dict[relation["type"]].append((relation["x"], relation["y"]))
 
-            for rel_type, edges in edge_dict.items():
-                graph_data["edu", rel_type, "edu"].edge_index = torch.tensor(edges, dtype=torch.long,
-                                                                             device=self.device).t().contiguous()
+        for rel_type, edges in edge_dict.items():
+            graph_data["edu", rel_type, "edu"].edge_index = torch.tensor(edges, dtype=torch.long,
+                                                                         device=self.device).t().contiguous()
 
-            self.graphs.append(graph_data)
+        self.graphs.append(graph_data)
 
     def __call__(self):
         """
@@ -140,7 +136,11 @@ class GraphBuilder:
             f"Starting graph construction for dataset/s {self.dataset_names}..."
         )
 
+        idx = 0
         for dialog in tqdm(self.dialogs, desc="Processing dialogs"):
+            idx += 1
+            if idx < 314:
+                continue
             augmented_edus = []
             edus = []
             speakers_list = []

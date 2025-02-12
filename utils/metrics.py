@@ -96,7 +96,7 @@ class Metrics:
                 convert_to_tensor=True,
                 show_progress_bar=False,
                 device=str(self.device)
-                )
+            )
 
             embedding_fake = self.sbert_model.encode(
                 fake_sentences,
@@ -110,7 +110,6 @@ class Metrics:
         self.log_metrics({"sentence_bert_similarity": cosine_sim}, stage, step)
 
         return cosine_sim.item()
-
 
     def reset_link_metrics(self):
         self.link_accuracy.reset()
@@ -130,4 +129,3 @@ class Metrics:
 
     def close_writer(self):
         self.writer.close()
-
