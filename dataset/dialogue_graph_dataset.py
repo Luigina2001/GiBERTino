@@ -1,13 +1,11 @@
 import os
-from itertools import permutations
-
 import torch
-from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Any
-from torch_geometric.data import HeteroData
 import numpy as np
-
 from utils import get_device
+from typing import List, Tuple
+from itertools import permutations
+from torch.utils.data import Dataset
+from torch_geometric.data import HeteroData
 
 
 class DialogueGraphDataset(Dataset):
@@ -30,11 +28,11 @@ class DialogueGraphDataset(Dataset):
     def __len__(self):
         return len(self.graph_files)
 
-    def __getitem__(self, index: int) -> Dict[str, Any]:
+    def __getitem__(self, index: int) -> HeteroData:
 
         graph_path = os.path.join(self.root, self.graph_files[index])
         try:
-            graph = torch.load(graph_path, map_location=self.deviceli)
+            graph = torch.load(graph_path, map_location=self.device)
         except Exception as e:
             raise ValueError(f"Error loading graph from {graph_path}: {e}")
 
@@ -45,18 +43,19 @@ class DialogueGraphDataset(Dataset):
 
         edges_permutations = list(permutations(torch.arange(graph["edu"].x.size(0)).tolist(), 2))
 
-        return {
-            "x": graph["edu"].x,
-            "edge_indices": torch.tensor(np.array(edges_permutations), dtype=torch.long).T,
-            "link_labels": link_labels,
-            "relation_labels": relation_labels
-        }
+        hetero_data = HeteroData()
+        hetero_data["edu"].x = graph["edu"].x
+        hetero_data["edu", "to", "edu"].edge_index = torch.tensor(np.array(edges_permutations), dtype=torch.long).T
+        hetero_data["edu", "to", "edu"].link_labels = link_labels
+        hetero_data["edu", "to", "edu"].relation_labels = relation_labels
+
+        return hetero_data
 
     def _generate_labels(self, graph: HeteroData, relation_types: List[str]) -> Tuple[torch.tensor, torch.tensor]:
         num_nodes = graph["edu"].x.size(0)
 
         # Link prediction labels
-        link_labels = torch.zeros((num_nodes, num_nodes), dtype=torch.float)
+        link_labels = torch.zeros((num_nodes, num_nodes), dtype=torch.long)
 
         # Relation prediction labels
         relation_labels = []
@@ -70,7 +69,8 @@ class DialogueGraphDataset(Dataset):
         # remove 'self-loops' from link labels
         mask = ~torch.eye(num_nodes, dtype=torch.bool)
         # n x (n-1) matrix -> containing only the link labels for other nodes
-        link_labels = link_labels[mask].view(num_nodes, -1)
+        # link_labels = link_labels[mask].view(num_nodes, -1)
+        link_labels = link_labels[mask].flatten()
 
         relation_labels = torch.tensor(relation_labels, dtype=torch.long)
 
