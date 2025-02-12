@@ -12,7 +12,7 @@ from transformers import pipeline
 from transformers.utils.logging import set_verbosity_error
 
 from transformations import BackTranslation
-from utils import load_dataset, display_graph
+from utils import load_dataset, display_graph, get_device
 from utils.constants import SENTIMENTS
 
 logging.basicConfig(
@@ -61,8 +61,7 @@ class GraphBuilder:
         self.dataset_names = dataset_names
         self.dataset_type = dataset_type
         self.dialogs = []
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+        self.device = get_device()
 
         # Load each dataset
         for path, name in zip(dataset_paths, dataset_names):

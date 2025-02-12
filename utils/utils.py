@@ -6,6 +6,7 @@ from typing import Optional
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import networkx as nx
+import torch.backends.mps
 from matplotlib import pyplot as plt
 from torch_geometric.data import HeteroData
 from torch_geometric.utils.convert import to_networkx
@@ -94,3 +95,8 @@ def display_graph(graph: HeteroData, dataset_name: Optional[str] = None):
 
     except Exception as e:
         logger.warning(f"Failed to display graph: {e}.")
+
+
+def get_device():
+    return torch.device(
+        "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))

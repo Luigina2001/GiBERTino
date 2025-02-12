@@ -5,6 +5,8 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from sentence_transformers import SentenceTransformer, util
 from torchmetrics.classification import Accuracy, Precision, Recall, F1Score
 
+from .utils import get_device
+
 
 class Metrics:
     def __init__(self,
@@ -15,11 +17,7 @@ class Metrics:
 
         self.logger = TensorBoardLogger(log_dir, name=logger_name)
         self.num_classes = num_classes
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else
-            "mps" if torch.backends.mps.is_available() else
-            "cpu"
-        )
+        self.device = get_device()
         self.sentence_model = sentence_model
         self.writer = SummaryWriter(log_dir=log_dir)
 

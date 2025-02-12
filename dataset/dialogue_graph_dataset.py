@@ -5,6 +5,9 @@ import torch
 from torch.utils.data import Dataset
 from typing import Dict, List, Tuple, Any
 from torch_geometric.data import HeteroData
+import numpy as np
+
+from utils import get_device
 
 
 class DialogueGraphDataset(Dataset):
@@ -19,6 +22,7 @@ class DialogueGraphDataset(Dataset):
         self.transform = transform
         self.dataset_type = dataset_type
         self.graph_files = [f for f in os.listdir(root) if f.endswith(".pt")]
+        self.device = get_device()
 
         if len(self.graph_files) == 0:
             raise ValueError(f"No graph found in directory: {root}")
@@ -30,7 +34,7 @@ class DialogueGraphDataset(Dataset):
 
         graph_path = os.path.join(self.root, self.graph_files[index])
         try:
-            graph = torch.load(graph_path)
+            graph = torch.load(graph_path, map_location=self.deviceli)
         except Exception as e:
             raise ValueError(f"Error loading graph from {graph_path}: {e}")
 
@@ -39,11 +43,11 @@ class DialogueGraphDataset(Dataset):
 
         link_labels, relation_labels = self._generate_labels(graph, relation_types)
 
-        edges_permutations = list(permutations(torch.arange(graph["edu"].x.size(0).tolist(), 2)))
+        edges_permutations = list(permutations(torch.arange(graph["edu"].x.size(0)).tolist(), 2))
 
         return {
             "x": graph["edu"].x,
-            "edge_indices": torch.tensor(edges_permutations, dtype=torch.long).T,
+            "edge_indices": torch.tensor(np.array(edges_permutations), dtype=torch.long).T,
             "link_labels": link_labels,
             "relation_labels": relation_labels
         }
