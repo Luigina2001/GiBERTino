@@ -2,8 +2,8 @@ from typing import Optional
 import pytorch_lightning as pl
 from utils.constants import DATA_DIR
 from torch_geometric.loader import DataLoader
-from torch_geometric.data import Batch, HeteroData
-from dialogue_graph_dataset import DialogueGraphDataset
+from torch_geometric.data import Batch
+from .dialogue_graph_dataset import DialogueGraphDataset
 
 
 class SubDialogueDataModule(pl.LightningDataModule):
@@ -28,14 +28,7 @@ class SubDialogueDataModule(pl.LightningDataModule):
     @staticmethod
     def collate_fn(batch):
         """Custom collate to handle heterogeneous graphs."""
-        return Batch.from_data_list([
-            HeteroData(
-                x=item["x"],
-                edge_indices=item["edge_indices"],
-                link_labels=item["link_labels"],
-                relation_labels=item["relation_labels"]
-            ) for item in batch
-        ])
+        return Batch.from_data_list(batch)
 
     def train_dataloader(self):
         return DataLoader(
