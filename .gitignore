@@ -75,4 +75,5 @@ target/
 # Emacs
 .#*
 
-dataset/dataset_normalization/relationship_frequencies_plots
+# Logs
+model/lightning_logs/

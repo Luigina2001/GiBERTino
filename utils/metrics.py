@@ -1,5 +1,5 @@
 import torch
-from typing import List
+from typing import List, Dict
 from torch.utils.tensorboard import SummaryWriter
 from pytorch_lightning.loggers import TensorBoardLogger
 from sentence_transformers import SentenceTransformer, util
@@ -12,8 +12,8 @@ class Metrics:
     def __init__(self,
                  num_classes: int = 12,
                  sentence_model: str = "Alibaba-NLP/gte-modernbert-base",
-                 log_dir: str = "tb_logs",
-                 logger_name: str = "gan_model_v0"):
+                 log_dir: str = "lightning_logs",
+                 logger_name: str = "GiBERTino_model"):
 
         self.logger = TensorBoardLogger(log_dir, name=logger_name)
         self.num_classes = num_classes
@@ -45,6 +45,9 @@ class Metrics:
             for key, value in metrics.items():
                 self.logger.experiment.add_scalar(f"{stage}/{key}", value, step)
                 self.writer.add_scalar(f"{stage}/{key}", value, step)
+
+    def log_losses(self, losses: Dict[str, float], stage: str, step: int):
+        self.log_metrics(losses, stage, step)
 
     def compute_link_metrics(self, predictions: torch.Tensor, labels: torch.Tensor,
                              stage: str, step: int, reset: bool = False) -> dict:
