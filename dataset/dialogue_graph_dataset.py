@@ -1,4 +1,6 @@
 import os
+from itertools import permutations
+
 import torch
 from torch.utils.data import Dataset
 from typing import Dict, List, Tuple, Any
@@ -37,12 +39,11 @@ class DialogueGraphDataset(Dataset):
 
         link_labels, relation_labels = self._generate_labels(graph, relation_types)
 
+        edges_permutations = list(permutations(torch.arange(graph["edu"].x.size(0).tolist(), 2)))
+
         return {
             "x": graph["edu"].x,
-            "edge_indices": {
-                rel_type: graph[rel_type].edge_index
-                for rel_type in relation_types
-            },
+            "edge_indices": torch.tensor(edges_permutations, dtype=torch.long).T,
             "link_labels": link_labels,
             "relation_labels": relation_labels
         }
@@ -61,6 +62,11 @@ class DialogueGraphDataset(Dataset):
             for src, dst in edge_index.t():
                 link_labels[src, dst] = 1  # 1 = there is a link
                 relation_labels.append(self._encode_relation_type(rel_type[1]))
+
+        # remove 'self-loops' from link labels
+        mask = ~torch.eye(num_nodes, dtype=torch.bool)
+        # n x (n-1) matrix -> containing only the link labels for other nodes
+        link_labels = link_labels[mask].view(num_nodes, -1)
 
         relation_labels = torch.tensor(relation_labels, dtype=torch.long)
 
