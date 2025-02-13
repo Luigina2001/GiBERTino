@@ -21,8 +21,8 @@ class GiBERTino(pl.LightningModule):
         self.link_predictor = nn.Sequential(
             nn.Linear(hidden_channels * 2, hidden_channels),
             nn.ReLU(),
-            nn.Linear(hidden_channels, 2),
-            nn.LogSoftmax(dim=1)
+            nn.Linear(hidden_channels, 1),
+            nn.LogSigmoid()
         )
 
         self.link_pl = nn.NLLLoss()
@@ -39,14 +39,21 @@ class GiBERTino(pl.LightningModule):
         return link_probs
 
     def _predict_links(self, node_embeddings, edge_index):
-        src, dst = edge_index
-        src_emb = node_embeddings[src]
-        dst_emb = node_embeddings[dst]
+        adj_matrix = torch.zeros(node_embeddings.shape[0])
+        print(adj_matrix)
+        mask = ~torch.eye(node_embeddings.shape[0], dtype=torch.bool)
+        for i in range(edge_index.shape[1]):
+            src = edge_index[0][i]
+            dst = edge_index[1][i]
+            src_emb = node_embeddings[src]
+            dst_emb = node_embeddings[dst]
 
-        pair_embeddings = torch.cat([src_emb, dst_emb], dim=1)
-        link_probs = self.link_predictor(pair_embeddings)
-
-        return link_probs
+            pair_embeddings = torch.cat([src_emb, dst_emb], dim=-1)
+            link_probs = self.link_predictor(pair_embeddings)
+            adj_matrix[src][dst] = (link_probs >= 0.5).long()
+        adj_matrix = adj_matrix[mask]
+        print(adj_matrix)
+        return adj_matrix
 
     def training_step(self, batch, batch_idx):
         print(batch)

@@ -71,7 +71,6 @@ class DialogueGraphDataset(Dataset):
         # n x (n-1) matrix -> containing only the link labels for other nodes
         # link_labels = link_labels[mask].view(num_nodes, -1)
         link_labels = link_labels[mask].flatten()
-
         relation_labels = torch.tensor(relation_labels, dtype=torch.long)
 
         return link_labels, relation_labels
