@@ -1,6 +1,5 @@
 import os.path as osp
 
-
 DATA_DIR = "data"
 MOLWENI = 'MOLWENI'
 STAC = 'STAC'
@@ -18,3 +17,9 @@ SENTIMENTS = {
     'POS': 1,
     'NEG': -1
 }
+
+EDGE_TYPES = [
+    'Clarification_question', 'Explanation', 'Contrast', 'Comment',
+    'Elaboration', 'Result', 'QAP', 'Correction', 'Narration',
+    'Acknowledgement', 'Q-Elab', 'Continuation'
+]

@@ -7,6 +7,8 @@ from itertools import permutations
 from torch.utils.data import Dataset
 from torch_geometric.data import HeteroData
 
+from utils.constants import EDGE_TYPES
+
 
 class DialogueGraphDataset(Dataset):
 
@@ -36,8 +38,8 @@ class DialogueGraphDataset(Dataset):
         except Exception as e:
             raise ValueError(f"Error loading graph from {graph_path}: {e}")
 
-        relation_types = [key for key in graph.keys() if isinstance(key, tuple)
-                          and key[0] == "edu" and key[2] == "edu"]
+        relation_types = [edge_type[1] for edge_type in graph.edge_types if
+                          edge_type[0] == edge_type[2] and edge_type[0] == 'edu']
 
         link_labels, relation_labels = self._generate_labels(graph, relation_types)
 
@@ -64,24 +66,20 @@ class DialogueGraphDataset(Dataset):
             edge_index = graph[rel_type].edge_index
             for src, dst in edge_index.t():
                 link_labels[src, dst] = 1  # 1 = there is a link
-                relation_labels.append(self._encode_relation_type(rel_type[1]))
+                relation_labels.append(self._encode_relation_type(rel_type))
 
         # remove 'self-loops' from link labels
         mask = ~torch.eye(num_nodes, dtype=torch.bool)
         # n x (n-1) matrix -> containing only the link labels for other nodes
-        # link_labels = link_labels[mask].view(num_nodes, -1)
-        link_labels = link_labels[mask].flatten()
+        link_labels = link_labels[mask]
+        # TODO: rimuovere archi all'indietro
         relation_labels = torch.tensor(relation_labels, dtype=torch.long)
 
         return link_labels, relation_labels
 
     @staticmethod
     def _encode_relation_type(edge_type) -> int:
-        edge_types = ['Clarification_question', 'Explanation', 'Contrast', 'Comment',
-                      'Elaboration', 'Result', 'QAP', 'Correction', 'Narration',
-                      'Acknowledgement', 'Q-Elab', 'Continuation']
-
-        if edge_type not in edge_types:
+        if edge_type not in EDGE_TYPES:
             raise ValueError(f"Unknown relation type: {edge_type}")
 
-        return edge_types.index(edge_type)
+        return EDGE_TYPES.index(edge_type)

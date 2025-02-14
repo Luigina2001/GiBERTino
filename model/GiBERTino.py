@@ -39,7 +39,7 @@ class GiBERTino(pl.LightningModule):
         return link_probs
 
     def _predict_links(self, node_embeddings, edge_index):
-        adj_matrix = torch.zeros(node_embeddings.shape[0])
+        adj_matrix = torch.zeros(node_embeddings.shape[0], node_embeddings.shape[0])
         print(adj_matrix)
         mask = ~torch.eye(node_embeddings.shape[0], dtype=torch.bool)
         for i in range(edge_index.shape[1]):
