@@ -2,7 +2,6 @@ from typing import Optional
 import pytorch_lightning as pl
 from utils.constants import DATA_DIR
 from torch_geometric.loader import DataLoader
-from torch_geometric.data import Batch
 from .dialogue_graph_dataset import DialogueGraphDataset
 
 
@@ -18,24 +17,18 @@ class SubDialogueDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
 
     def setup(self, stage: Optional[str] = None):
-        if stage == "fit" or stage is None:
+        if stage in ("fit", None):
             self.train_data = DialogueGraphDataset(self.root, "train")
             self.val_data = DialogueGraphDataset(self.root, "val")
 
-        if stage == "test" or stage is None:
+        if stage in ("test", None):
             self.test_data = DialogueGraphDataset(self.root, "test")
-
-    @staticmethod
-    def collate_fn(batch):
-        """Custom collate to handle heterogeneous graphs."""
-        return Batch.from_data_list(batch)
 
     def train_dataloader(self):
         return DataLoader(
             self.train_data,
             batch_size=self.batch_size,
             shuffle=True,
-            collate_fn=self.collate_fn,
             num_workers=self.num_workers
         )
 
@@ -44,7 +37,6 @@ class SubDialogueDataModule(pl.LightningDataModule):
             self.val_data,
             batch_size=self.batch_size,
             shuffle=False,
-            collate_fn=self.collate_fn,
             num_workers=self.num_workers
         )
 
@@ -53,6 +45,5 @@ class SubDialogueDataModule(pl.LightningDataModule):
             self.test_data,
             batch_size=self.batch_size,
             shuffle=False,
-            collate_fn=self.collate_fn,
             num_workers=self.num_workers
         )

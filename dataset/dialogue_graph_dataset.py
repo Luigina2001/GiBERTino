@@ -65,14 +65,14 @@ class DialogueGraphDataset(Dataset):
         for rel_type in relation_types:
             edge_index = graph[rel_type].edge_index
             for src, dst in edge_index.t():
-                link_labels[src, dst] = 1  # 1 = there is a link
-                relation_labels.append(self._encode_relation_type(rel_type))
+                if src < dst:  # removal of backward arches
+                    link_labels[src, dst] = 1  # 1 = there is a link
+                    relation_labels.append(self._encode_relation_type(rel_type))
 
         # remove 'self-loops' from link labels
         mask = ~torch.eye(num_nodes, dtype=torch.bool)
         # n x (n-1) matrix -> containing only the link labels for other nodes
         link_labels = link_labels[mask]
-        # TODO: rimuovere archi all'indietro
         relation_labels = torch.tensor(relation_labels, dtype=torch.long)
 
         return link_labels, relation_labels
