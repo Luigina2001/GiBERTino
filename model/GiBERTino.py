@@ -68,7 +68,6 @@ class GiBERTino(pl.LightningModule):
         return link_probs
 
     def training_step(self, batch, batch_idx):
-        # print(batch)
         link_probs = self(batch)  # Model predictions
         link_labels = batch["edu", "to", "edu"].link_labels.long()
         link_loss = self.link_pl(link_probs, link_labels)
@@ -77,7 +76,7 @@ class GiBERTino(pl.LightningModule):
         # relation_labels = batch["edu", "to", "edu"].relation_labels
         # relation_loss = self.rel_pl(relation_probs, relation_labels)
 
-        self.metrics.compute_link_metrics(
+        link_metrics = self.metrics.compute_link_metrics(
             predictions=link_probs.argmax(dim=1),
             labels=link_labels,
             stage="train",
@@ -91,6 +90,9 @@ class GiBERTino(pl.LightningModule):
             "total_loss": total_loss
         }
         self.metrics.log_losses(losses, stage="train", step=self.global_step)
+        losses.update(link_metrics)
+
+        self.log_dict(losses, prog_bar=True)
 
         return total_loss
 
