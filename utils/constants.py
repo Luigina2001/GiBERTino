@@ -23,3 +23,6 @@ EDGE_TYPES = [
     'Elaboration', 'Result', 'QAP', 'Correction', 'Narration',
     'Acknowledgement', 'Q-Elab', 'Continuation'
 ]
+
+NEGATIVE_SAMPLES_PERCENTAGE = 50
+BATCH_SIZE = 32

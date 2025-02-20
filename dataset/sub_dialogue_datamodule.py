@@ -1,13 +1,13 @@
 from typing import Optional
 import pytorch_lightning as pl
-from utils.constants import DATA_DIR
+from utils.constants import DATA_DIR, BATCH_SIZE
 from torch_geometric.loader import DataLoader
 from .dialogue_graph_dataset import DialogueGraphDataset
 
 
 class SubDialogueDataModule(pl.LightningDataModule):
 
-    def __init__(self, root: str = DATA_DIR, batch_size: int = 32, num_workers: int = 4):
+    def __init__(self, root: str = DATA_DIR, batch_size: int = BATCH_SIZE, num_workers: int = 4):
         super().__init__()
         self.train_data = None
         self.val_data = None
@@ -29,7 +29,8 @@ class SubDialogueDataModule(pl.LightningDataModule):
             self.train_data,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            persistent_workers=True
         )
 
     def val_dataloader(self):
@@ -37,7 +38,8 @@ class SubDialogueDataModule(pl.LightningDataModule):
             self.val_data,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            persistent_workers=True
         )
 
     def test_dataloader(self):
@@ -45,5 +47,6 @@ class SubDialogueDataModule(pl.LightningDataModule):
             self.test_data,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            persistent_workers=True
         )

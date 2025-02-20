@@ -3,14 +3,15 @@ from typing import List, Dict
 from torch.utils.tensorboard import SummaryWriter
 from pytorch_lightning.loggers import TensorBoardLogger
 from sentence_transformers import SentenceTransformer, util
-from torchmetrics.classification import Accuracy, Precision, Recall, F1Score
+from torchmetrics.classification import Accuracy, Precision, Recall, F1Score, AUROC
 
 from .utils import get_device
+from .constants import NUM_RELATIONS
 
 
 class Metrics:
     def __init__(self,
-                 num_classes: int = 12,
+                 num_classes: int = NUM_RELATIONS + 1,
                  sentence_model: str = "Alibaba-NLP/gte-modernbert-base",
                  log_dir: str = "lightning_logs",
                  logger_name: str = "GiBERTino_model"):
@@ -58,7 +59,7 @@ class Metrics:
             "link_accuracy": self.link_accuracy(predictions, labels),
             "link_precision": self.link_precision(predictions, labels),
             "link_recall": self.link_recall(predictions, labels),
-            "link_f1_score": self.link_f1_score(predictions, labels)
+            "link_f1_score": self.link_f1_score(predictions, labels),
         }
 
         self.log_metrics(metrics, stage, step)
@@ -78,7 +79,7 @@ class Metrics:
             "relation_accuracy": self.relation_accuracy(predictions, labels),
             "relation_precision": self.relation_precision(predictions, labels),
             "relation_recall": self.relation_recall(predictions, labels),
-            "relation_f1_score": self.relation_f1_score(predictions, labels)
+            "relation_f1_score": self.relation_f1_score(predictions, labels),
         }
 
         self.log_metrics(metrics, stage, step)
