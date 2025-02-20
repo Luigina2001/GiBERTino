@@ -97,7 +97,7 @@ tokenizers==0.21.0
 torchmetrics==1.6.1
 torchvision==0.18.1
 tornado==6.4.2
-tqdm==4.66.5
+tqdm~=4.67.1
 traitlets==5.14.3
 transformers==4.48.2
 typing-extensions==4.12.2
@@ -109,3 +109,5 @@ wheel==0.45.1
 widgetsnbextension==4.0.13
 yarl==1.18.0
 zipp==3.21.0
+torch~=2.1.2
+rich~=13.9.4

@@ -4,7 +4,6 @@ import random
 import torch
 import numpy as np
 from utils import get_device
-from typing import List, Tuple
 from itertools import permutations
 from torch.utils.data import Dataset
 from torch_geometric.data import HeteroData
@@ -84,30 +83,6 @@ class DialogueGraphDataset(Dataset):
 
         return hetero_data.to(self.device)
 
-    def _generate_labels(self, graph: HeteroData, relation_types: List[str]) -> Tuple[torch.tensor, torch.tensor]:
-        num_nodes = graph["edu"].x.size(0)
-
-        # Link prediction labels
-        link_labels = torch.zeros((num_nodes, num_nodes), dtype=torch.long)
-
-        # Relation prediction labels
-        relation_labels = []
-
-        for rel_type in relation_types:
-            edge_index = graph[rel_type].edge_index
-            for src, dst in edge_index.t():
-                if src < dst:  # removal of backward arches
-                    link_labels[src, dst] = 1  # 1 = there is a link
-                    relation_labels.append(self._encode_relation_type(rel_type))
-
-        # remove 'self-loops' from link labels
-        mask = ~torch.eye(num_nodes, dtype=torch.bool)
-        # n x (n-1) matrix -> containing only the link labels for other nodes
-        link_labels = link_labels[mask]
-        relation_labels = torch.tensor(relation_labels, dtype=torch.long)
-
-        return link_labels, relation_labels
-
     @staticmethod
     def _encode_relation_type(edge_type) -> int:
         if edge_type not in EDGE_TYPES:
@@ -115,7 +90,3 @@ class DialogueGraphDataset(Dataset):
 
         return EDGE_TYPES.index(edge_type)
 
-
-if __name__ == '__main__':
-    data = DialogueGraphDataset("../data/BALANCED/graphs/test", "train")
-    x = data[17]

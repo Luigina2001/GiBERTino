@@ -9,6 +9,7 @@ from dataset.sub_dialogue_datamodule import SubDialogueDataModule
 from utils import get_device
 from utils.metrics import Metrics
 from utils.constants import NUM_RELATIONS
+from utils import print_metrics
 
 
 class GiBERTino(pl.LightningModule):
@@ -96,7 +97,26 @@ class GiBERTino(pl.LightningModule):
         losses.update(link_metrics)
         losses.update(relation_metrics)
 
-        self.log_dict(losses, on_step=True, logger=True, prog_bar=True)
+        batch_size = batch["edu", "to", "edu"].link_labels.shape[0]
+        self.log("train/total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=batch_size)
+        self.log("train/link_accuracy", link_metrics["link_accuracy"], on_step=True, on_epoch=True, prog_bar=True,
+                 batch_size=batch_size)
+        self.log("train/relation_accuracy", relation_metrics["relation_accuracy"], on_step=True, on_epoch=True,
+                 prog_bar=True, batch_size=batch_size)
+
+        if self.global_step % 10 == 0:
+            metrics_to_print = {
+                "link_loss": link_loss.item(),
+                "relation_loss": relation_loss.item(),
+                "total_loss": total_loss.item(),
+                "link_accuracy": link_metrics["link_accuracy"].item(),
+                "link_precision": link_metrics["link_precision"].item(),
+                "link_recall": link_metrics["link_recall"].item(),
+                "relation_accuracy": relation_metrics["relation_accuracy"].item(),
+                "relation_precision": relation_metrics["relation_precision"].item(),
+                "relation_recall": relation_metrics["relation_recall"].item()
+            }
+            print_metrics(self.global_step, metrics_to_print)
 
         return total_loss
 
@@ -124,5 +144,10 @@ if __name__ == "__main__":
     data_module.setup(stage="fit")
     train_loader = data_module.train_dataloader()
 
-    trainer = pl.Trainer(max_epochs=100, log_every_n_steps=10, accelerator=str(get_device()), logger=model.metrics.logger)
+    trainer = pl.Trainer(
+        max_epochs=2,
+        log_every_n_steps=10,
+        accelerator=str(get_device()),
+        logger=model.metrics.logger
+    )
     trainer.fit(model=model, train_dataloaders=train_loader)

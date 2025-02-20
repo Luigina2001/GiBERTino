@@ -10,6 +10,8 @@ import torch.backends.mps
 from matplotlib import pyplot as plt
 from torch_geometric.data import HeteroData
 from torch_geometric.utils.convert import to_networkx
+from rich.console import Console
+from rich.table import Table
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -100,3 +102,15 @@ def display_graph(graph: HeteroData, dataset_name: Optional[str] = None):
 def get_device():
     return torch.device(
         "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+
+
+def print_metrics(step, metrics):
+    table = Table(title=f"Metrics at step {step}")
+
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right", style="green")
+
+    for k, v in metrics.items():
+        table.add_row(k, f"{v:.4f}")
+    console = Console()
+    console.print(table)
