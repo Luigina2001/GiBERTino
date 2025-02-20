@@ -3,7 +3,7 @@ from typing import List, Dict
 from torch.utils.tensorboard import SummaryWriter
 from pytorch_lightning.loggers import TensorBoardLogger
 from sentence_transformers import SentenceTransformer, util
-from torchmetrics.classification import Accuracy, Precision, Recall, F1Score, AUROC
+from torchmetrics.classification import Accuracy, Precision, Recall, F1Score, BinaryAUROC, AUROC
 
 from .utils import get_device
 from .constants import NUM_RELATIONS
@@ -27,6 +27,7 @@ class Metrics:
         self.link_precision = Precision(task="binary").to(self.device)
         self.link_recall = Recall(task="binary").to(self.device)
         self.link_f1_score = F1Score(task="binary").to(self.device)
+        self.link_roc = BinaryAUROC(thresholds=None).to(self.device)
 
         # Relation prediction (Multiclass)
         self.relation_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes,
@@ -37,6 +38,8 @@ class Metrics:
                                       average="macro").to(self.device)
         self.relation_f1_score = F1Score(task="multiclass", num_classes=self.num_classes,
                                          average="macro").to(self.device)
+        self.relation_roc = AUROC(task="multiclass", num_classes=self.num_classes,
+                                  average="macro").to(self.device)
 
         self.sbert_model = SentenceTransformer(self.sentence_model).to(self.device)
         self.sbert_model.eval()
@@ -60,6 +63,7 @@ class Metrics:
             "link_precision": self.link_precision(predictions, labels),
             "link_recall": self.link_recall(predictions, labels),
             "link_f1_score": self.link_f1_score(predictions, labels),
+            "link_roc": self.link_roc(predictions, labels)
         }
 
         self.log_metrics(metrics, stage, step)
@@ -71,6 +75,7 @@ class Metrics:
 
     def compute_relation_metrics(self, predictions: torch.Tensor, labels: torch.Tensor,
                                  stage: str, step: int, reset: bool = False) -> dict:
+        predictions_probs = predictions
         if predictions.ndim == 1:  # if they are classes
             predictions = predictions.long()
         else:  # if they are logits/probabilities
@@ -80,6 +85,7 @@ class Metrics:
             "relation_precision": self.relation_precision(predictions, labels),
             "relation_recall": self.relation_recall(predictions, labels),
             "relation_f1_score": self.relation_f1_score(predictions, labels),
+            "relation_roc": self.relation_roc(predictions_probs, labels)
         }
 
         self.log_metrics(metrics, stage, step)
@@ -118,12 +124,14 @@ class Metrics:
         self.link_precision.reset()
         self.link_recall.reset()
         self.link_f1_score.reset()
+        self.link_roc.reset()
 
     def reset_relation_metrics(self):
         self.relation_accuracy.reset()
         self.relation_precision.reset()
         self.relation_precision.reset()
         self.relation_f1_score.reset()
+        self.relation_roc.reset()
 
     def reset_all_metrics(self):
         self.reset_link_metrics()
