@@ -1,5 +1,7 @@
 import os.path as osp
 
+from torchmetrics.classification import Accuracy, Precision, Recall, F1Score, BinaryAUROC, AUROC
+
 DATA_DIR = "data"
 MOLWENI = 'MOLWENI'
 STAC = 'STAC'
@@ -24,5 +26,23 @@ EDGE_TYPES = [
     'Acknowledgement', 'Q-Elab', 'Continuation'
 ]
 
-NEGATIVE_SAMPLES_PERCENTAGE = 50
+NEGATIVE_SAMPLES_RATIO = 50
 BATCH_SIZE = 32
+NUM_WORKERS = 4
+
+METRICS = {
+    "link": {
+        "accuracy": Accuracy(task='binary'),
+        "precision": Precision(task='binary'),
+        "recall": Recall(task='binary'),
+        "f1": F1Score(task='binary'),
+        "roc": BinaryAUROC(),
+    },
+    "rel": {
+        "accuracy": Accuracy,
+        "precision": Precision,
+        "recall": Recall,
+        "f1": F1Score,
+        "roc": AUROC,
+    }
+}

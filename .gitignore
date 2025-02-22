@@ -76,4 +76,4 @@ target/
 .#*
 
 # Logs
-model/lightning_logs/
+lightning_logs/

@@ -13,6 +13,8 @@ from torch_geometric.utils.convert import to_networkx
 from rich.console import Console
 from rich.table import Table
 
+from utils.constants import EDGE_TYPES
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -114,3 +116,9 @@ def print_metrics(step, metrics):
         table.add_row(k, f"{v:.4f}")
     console = Console()
     console.print(table)
+
+
+def encode_relation_type(edge_type: str) -> int:
+    if edge_type not in EDGE_TYPES:
+        raise ValueError(f"Unknown relation type: {edge_type}")
+    return EDGE_TYPES.index(edge_type)
