@@ -1,0 +1,101 @@
+import torch
+from dataset.dialogue_graph_datamodule import SubDialogueDataModule
+from model.GiBERTino import GiBERTino
+from utils.metrics import Metrics
+from utils.utils import get_device
+
+def test_model(checkpoint_path: str, data_path: str): # noqa
+    """
+    Load the model from the checkpoint, perform classification on test data, and compute evaluation metrics.
+    """
+    device = get_device()
+    print(f"Loading model from checkpoint: {checkpoint_path}")
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        # print(checkpoint.keys())
+        # print(checkpoint["hyper_parameters"])
+        state_dict = checkpoint["state_dict"]  # Extract only the model weights
+
+        new_state_dict = {}
+
+        # TODO: to remove
+        for key, value in state_dict.items():
+            if "link_predictor" in key:
+                new_key = key.replace("link_predictor", "link_classifier")
+            elif "relation_predictor" in key:
+                new_key = key.replace("relation_predictor", "rel_classifier")
+            else:
+                new_key = key
+            new_state_dict[new_key] = value
+
+        # Extract model parameters from the checkpoint
+        model_config = checkpoint.get("hyper_parameters", {})
+        in_channels = model_config.get("in_channels", 2304)
+        hidden_channels = model_config.get("hidden_channels", 10)
+        num_layers = model_config.get("num_layers", 3)
+
+        print(f"Model parameters loaded from checkpoint: "
+              f"in_channels={in_channels}, hidden_channels={hidden_channels}, num_layers={num_layers}")
+
+        model = GiBERTino(model="GCN", in_channels=in_channels, hidden_channels=hidden_channels, num_layers=num_layers)
+        model.load_state_dict(new_state_dict, strict=True)
+        model.to(device)
+        model.eval()
+
+        print("Loading test data...")
+        data_module = SubDialogueDataModule(data_path)
+        data_module.setup(stage="test")
+        test_loader = data_module.test_dataloader()
+
+        metrics = Metrics()
+
+        print("Running classification...")
+        with torch.no_grad():
+            for batch in test_loader:
+                batch = {k: v.to(device) for k, v in batch.items()} if isinstance(batch, dict) else batch.to(device)
+
+                link_logits, rel_probs = model(batch)
+
+                # print(f"Batch_keys: {batch.keys()}")
+                # print(f"Batch[('edu', 'to', 'edu')]: {batch[('edu', 'to', 'edu')]}")
+
+                link_labels = batch[('edu', 'to', 'edu')].get('link_labels', None)
+                rel_labels = batch[('edu', 'to', 'edu')].get('rel_labels', None)
+
+                link_metrics = metrics.compute_metrics(link_logits, link_labels, 'link', 'test', 0)
+                rel_metrics = metrics.compute_metrics(rel_probs, rel_labels, 'rel', 'test', 0)
+
+                metrics.log({
+                    'link_accuracy': link_metrics['link_accuracy'],
+                    'link_precision': link_metrics['link_precision'],
+                    'link_recall': link_metrics['link_recall'],
+                    'link_f1': link_metrics['link_f1'],
+                    'link_roc': link_metrics['link_roc'],
+                    'rel_accuracy': rel_metrics['rel_accuracy'],
+                    'rel_precision': rel_metrics['rel_precision'],
+                    'rel_recall': rel_metrics['rel_recall'],
+                    'rel_f1': rel_metrics['rel_f1'],
+                    'rel_roc': rel_metrics['rel_roc']
+                }, 'test', 0)
+
+        # Aggregate metrics over all batches
+        aggregated_metrics = metrics.aggregate_metrics()
+
+        print("Test results:")
+        for key, value in aggregated_metrics.items():
+            print(f"{key}: {value:.4f}")
+        print("\nAggregate metrics:")
+        print(f"Link Prediction Accuracy: {aggregated_metrics['link_accuracy']:.4f}")
+        print(f"Relation Classification Accuracy: {aggregated_metrics['rel_accuracy']:.4f}")
+
+        return aggregated_metrics
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+
+if __name__ == "__main__":
+    checkpoint_path = "aaa-epoch=29-val_loss=0.00.ckpt"
+    data_path = "./data/BALANCED/graphs/"
+    test_model(checkpoint_path, data_path)

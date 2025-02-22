@@ -21,6 +21,12 @@ class Metrics:
         self.num_classes = num_classes
         self.device = get_device()
 
+        # Initialize accumulators
+        self.link_metrics_accumulator = {metric: 0.0 for metric in METRICS["link"]}
+        self.rel_metrics_accumulator = {metric: 0.0 for metric in METRICS["rel"]}
+        self.num_batches = 0
+
+        # Initialize metric functions
         for metric in METRICS["link"]:
             setattr(self, f"link_{metric}", METRICS["link"][metric].to(self.device))
 
@@ -41,11 +47,29 @@ class Metrics:
                         stage: str, step: int) -> dict:
         metrics = {}
         for metric in METRICS[metric_type]:
-            metrics[f"{metric_type}_{metric}"] = getattr(self, f"{metric_type}_{metric}")(preds, target).item()
+            metric_value = getattr(self, f"{metric_type}_{metric}")(preds, target).item()
+            metrics[f"{metric_type}_{metric}"] = metric_value
 
+            # Accumulate metrics
+            if metric_type == 'link':
+                self.link_metrics_accumulator[metric] += metric_value
+            else:
+                self.rel_metrics_accumulator[metric] += metric_value
+
+        self.num_batches += 1
         self.log(metrics, stage, step)
 
         return metrics
+
+    def aggregate_metrics(self):
+        # Compute average metrics over all batches
+        aggregated_metrics = {}
+        for metric in self.link_metrics_accumulator:
+            aggregated_metrics[f"link_{metric}"] = self.link_metrics_accumulator[metric] / self.num_batches
+        for metric in self.rel_metrics_accumulator:
+            aggregated_metrics[f"rel_{metric}"] = self.rel_metrics_accumulator[metric] / self.num_batches
+
+        return aggregated_metrics
 
     def compute_sbert_similarity(self, preds: List[str], target: List[str], stage: str, step: int,
                                  batch_size: int = BATCH_SIZE):
