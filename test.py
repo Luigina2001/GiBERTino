@@ -3,6 +3,7 @@ from dataset.dialogue_graph_datamodule import SubDialogueDataModule
 from model.GiBERTino import GiBERTino
 from utils.metrics import Metrics
 from utils.utils import get_device
+import lightning
 
 def test_model(checkpoint_path: str, data_path: str): # noqa
     """
@@ -96,6 +97,7 @@ def test_model(checkpoint_path: str, data_path: str): # noqa
 
 
 if __name__ == "__main__":
+    lightning.seed_everything(42)
     checkpoint_path = "aaa-epoch=29-val_loss=0.00.ckpt"
     data_path = "./data/BALANCED/graphs/"
     test_model(checkpoint_path, data_path)

@@ -81,18 +81,18 @@ class GiBERTino(L.LightningModule):
                        f'{stage}/rel_accuracy': rel_metrics['rel_accuracy']}, on_step=True, on_epoch=True,
                       batch_size=batch.batch_size, prog_bar=True, logger=True)
 
-        # if self.global_step % self.trainer.log_every_n_steps == 0:  # noqa
-        #     print_metrics(self.global_step, {
-        #         f"{stage}/link_loss": link_loss.item(),
-        #         f"{stage}/rel_loss": rel_loss.item(),
-        #         f"{stage}/total_loss": loss.item(),
-        #         f"{stage}/link_accuracy": link_metrics["link_accuracy"],
-        #         f"{stage}/link_precision": link_metrics["link_precision"],
-        #         f"{stage}/link_recall": link_metrics["link_recall"],
-        #         f"{stage}/rel_accuracy": rel_metrics["rel_accuracy"],
-        #         f"{stage}/rel_precision": rel_metrics["rel_precision"],
-        #         f"{stage}/rel_recall": rel_metrics["rel_recall"]
-        #     })
+        if self.global_step % self.trainer.log_every_n_steps == 0:  # noqa
+            print_metrics(self.global_step, {
+                f"{stage}/link_loss": link_loss.item(),
+                f"{stage}/rel_loss": rel_loss.item(),
+                f"{stage}/total_loss": loss.item(),
+                f"{stage}/link_accuracy": link_metrics["link_accuracy"],
+                f"{stage}/link_precision": link_metrics["link_precision"],
+                f"{stage}/link_recall": link_metrics["link_recall"],
+                f"{stage}/rel_accuracy": rel_metrics["rel_accuracy"],
+                f"{stage}/rel_precision": rel_metrics["rel_precision"],
+                f"{stage}/rel_recall": rel_metrics["rel_recall"]
+            })
 
         return loss
 
@@ -112,59 +112,3 @@ class GiBERTino(L.LightningModule):
                 "scheduler": lr_scheduler
             }
         }
-
-
-def train(args):
-    L.seed_everything(args.seed)
-
-    model = GiBERTino(
-        model=args.model_name,
-        in_channels=args.in_channels,
-        hidden_channels=args.hidden_channels,
-        num_layers=args.num_layers,
-    )
-
-    data_module = SubDialogueDataModule(args.data_path)
-    data_module.setup(stage="fit")
-
-    trainer = L.Trainer(
-        max_epochs=args.max_epochs,
-        log_every_n_steps=args.log_every_n_steps,
-        accelerator=str(get_device()),
-        logger=model.metrics.logger,
-        deterministic=True,
-        enable_progress_bar=True,
-    )
-
-    trainer.fit(model=model, train_dataloaders=data_module.train_dataloader())
-
-
-def argument_parser():
-    parser = argparse.ArgumentParser(
-        description="GiBERTino Training Script",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-
-    # General settings
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--max_epochs", type=int, default=100, help="Maximum number of epochs")
-    parser.add_argument("--log_every_n_steps", type=int, default=10, help="Log frequency in steps")
-    parser.add_argument("--data_path", type=str, default="./data/BALANCED/graphs/", help="Path to training data")
-    parser.add_argument("--checkpoint_path", type=str, default=None, help="Path to model checkpoint (optional)")
-
-    # Model hyperparameters
-    parser.add_argument("--model_name", type=str, choices=["GCN", "GAT"], default="GCN", help="Graph model type")
-    parser.add_argument("--in_channels", type=int, default=2304, help="Input feature dimension")
-    parser.add_argument("--hidden_channels", type=int, default=10, help="Hidden layer dimension")
-    parser.add_argument("--num_layers", type=int, default=3, help="Number of graph model layers")
-
-    return parser
-
-
-def main(args):
-    train(args)
-
-
-if __name__ == '__main__':
-    args = argument_parser().parse_args()
-    main(args)
