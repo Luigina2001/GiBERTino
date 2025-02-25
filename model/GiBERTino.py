@@ -1,13 +1,12 @@
-import argparse
 from typing import Literal, Optional
 
-import lightning as L
 import torch
 import torch.nn as nn
 import torch_geometric
+import lightning as L
+import torch.nn.functional as F
 
-from dataset.dialogue_graph_datamodule import SubDialogueDataModule
-from utils import get_device, print_metrics
+from utils import print_metrics
 from utils.metrics import Metrics
 from utils.constants import NUM_RELATIONS
 
@@ -21,7 +20,9 @@ class GiBERTino(L.LightningModule):
                                                         num_layers=num_layers)
 
         self.link_classifier = nn.Sequential(
-            nn.Linear(hidden_channels * 2, hidden_channels),
+            # Multiply by 2 to account for both source (src) and destination (dst) node embeddings,
+            # and add 1 to include the cosine similarity, which is concatenated to the embeddings.
+            nn.Linear(hidden_channels * 2 + 1, hidden_channels),
             nn.ReLU(),
             nn.Linear(hidden_channels, 1)
         )
@@ -48,7 +49,12 @@ class GiBERTino(L.LightningModule):
         src, dst = edge_index
         embeddings = torch.cat([node_embeddings[src], node_embeddings[dst]], dim=-1)
 
+        src_emb = F.normalize(node_embeddings[src], dim=-1)
+        dst_emb = F.normalize(node_embeddings[dst], dim=-1)
+        cosine_sim = F.cosine_similarity(src_emb, dst_emb, dim=-1, eps=1e-8).unsqueeze(-1)
+
         if predict == 'link':
+            embeddings = torch.cat([embeddings, cosine_sim], dim=-1)
             return self.link_classifier(embeddings).squeeze(dim=-1)
         return self.rel_classifier(embeddings)
 
