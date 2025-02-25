@@ -1,24 +1,32 @@
-import argparse
 from typing import Literal, Optional
 
 import lightning as L
 import torch
 import torch.nn as nn
 import torch_geometric
+from transformers import AutoModel
 
-from dataset.dialogue_graph_datamodule import SubDialogueDataModule
-from utils import get_device, print_metrics
-from utils.metrics import Metrics
+from utils import print_metrics
 from utils.constants import NUM_RELATIONS
+from utils.metrics import Metrics
+
+from transformers import AutoTokenizer, AutoModel
 
 
 class GiBERTino(L.LightningModule):
-    def __init__(self, model: str, in_channels: int, hidden_channels: int, num_layers: int,
+    def __init__(self, gnn_model: Literal['GCN', 'GAT'], in_channels: int,
+                 hidden_channels: int, num_layers: int,
+                 tokenizer: str = 'Alibaba-NLP/gte-modernbert-base',
+                 bert_model: str = 'Alibaba-NLP/gte-modernbert-base',
                  checkpoint_path: Optional[str] = None):
         super().__init__()
 
-        self.model = getattr(torch_geometric.nn, model)(in_channels=in_channels, hidden_channels=hidden_channels,
-                                                        num_layers=num_layers)
+        self.gnn_model = getattr(torch_geometric.nn, gnn_model)(
+            in_channels=in_channels, hidden_channels=hidden_channels,
+            num_layers=num_layers)
+
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
+        self.bert_model = AutoModel.from_pretrained(bert_model)
 
         self.link_classifier = nn.Sequential(
             nn.Linear(hidden_channels * 2, hidden_channels),
@@ -44,15 +52,52 @@ class GiBERTino(L.LightningModule):
         # save hyperparameters when saving checkpoint
         self.save_hyperparameters()
 
-    def _predict(self, node_embeddings, edge_index, predict: Literal['link', 'rel']):
+    def _predict(self, node_embeddings, edge_index,
+                 predict: Literal['link', 'rel']):
         src, dst = edge_index
-        embeddings = torch.cat([node_embeddings[src], node_embeddings[dst]], dim=-1)
+        embeddings = torch.cat([node_embeddings[src], node_embeddings[dst]],
+                               dim=-1)
 
         if predict == 'link':
             return self.link_classifier(embeddings).squeeze(dim=-1)
         return self.rel_classifier(embeddings)
 
     def forward(self, batch):
+        # tokenize raw edus
+        # AutoTokenizer expects a flat list of texts but the dataloader returns
+        # a list of lists of texts
+        # keep track of which edus correspond to which graph
+        edu_indices = [len(edus) for edus in batch["edu"].edus]
+        flat_edus = [edu for edus in batch["edu"].edus for edu in edus]
+
+        tokenized_edus = self.tokenizer(flat_edus, padding=True, return_tensors="pt")
+        outputs = self.bert_model(**tokenized_edus)
+        # the last hidden state contains token-level contextualized embeddings:
+        # for each edu, we'll have an embedding for each token in the edu
+        # token-level embeddings correspond to local embeddings, in order to
+        # get global-level embeddings we need to perform a sort of pooling
+        # operation
+        flat_local_embeddings = outputs.last_hidden_state
+
+        # get local embeddings per graph, returned as a tuple
+        local_embeddings = torch.split(flat_local_embeddings, edu_indices)
+        local_attention_masks = torch.split(tokenized_edus["attention_mask"], edu_indices)
+
+        node_embeddings = []
+
+        for i in range(batch.batch_size):
+            # the attention mask indices indicate which tokens are actual words (1)
+            # and which are padding tokens (0)
+            input_mask_expanded = local_attention_masks[i].unsqueeze(-1).expand(
+                local_embeddings[i].shape).float()
+
+            sum_embeddings = torch.sum(local_embeddings[i] * input_mask_expanded,
+                                       dim=1)
+            sum_mask = input_mask_expanded.sum(dim=1).clamp(min=1e-9)
+            global_embeddings = sum_embeddings / sum_mask
+            node_embeddings.append(torch.cat((local_embeddings[i], global_embeddings), dim=1))
+
+
         x, edge_index = batch["edu"].x, batch["edu", "to", "edu"].edge_index
         embeddings = self.model(x, edge_index)
 
@@ -66,10 +111,14 @@ class GiBERTino(L.LightningModule):
         link_labels = batch["edu", "to", "edu"].link_labels.float()
         rel_labels = batch["edu", "to", "edu"].rel_labels
 
-        link_metrics = self.metrics.compute_metrics(link_logits, link_labels, 'link', stage, self.global_step)
-        rel_metrics = self.metrics.compute_metrics(rel_probs, rel_labels, 'rel', stage, self.global_step)
+        link_metrics = self.metrics.compute_metrics(link_logits, link_labels,
+                                                    'link', stage,
+                                                    self.global_step)
+        rel_metrics = self.metrics.compute_metrics(rel_probs, rel_labels, 'rel',
+                                                   stage, self.global_step)
 
-        self.metrics.log({'link_accuracy': link_metrics['link_accuracy'], 'rel_accuracy': rel_metrics['rel_accuracy']},
+        self.metrics.log({'link_accuracy': link_metrics['link_accuracy'],
+                          'rel_accuracy': rel_metrics['rel_accuracy']},
                          'train', self.global_step)
 
         link_loss = self.link_loss(link_logits, link_labels)
@@ -77,8 +126,10 @@ class GiBERTino(L.LightningModule):
 
         loss = link_loss + rel_loss
 
-        self.log_dict({f'{stage}/loss': loss, f'{stage}/link_accuracy': link_metrics['link_accuracy'],
-                       f'{stage}/rel_accuracy': rel_metrics['rel_accuracy']}, on_step=True, on_epoch=True,
+        self.log_dict({f'{stage}/loss': loss,
+                       f'{stage}/link_accuracy': link_metrics['link_accuracy'],
+                       f'{stage}/rel_accuracy': rel_metrics['rel_accuracy']},
+                      on_step=True, on_epoch=True,
                       batch_size=batch.batch_size, prog_bar=True, logger=True)
 
         if self.global_step % self.trainer.log_every_n_steps == 0:  # noqa

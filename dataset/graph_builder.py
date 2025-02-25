@@ -29,7 +29,6 @@ class GraphBuilder:
             dataset_paths: Union[List[str], str],
             dataset_names: Union[str, List[str]],
             dataset_type: Literal["test", "train", "val"],
-            sentence_model: str = "Alibaba-NLP/gte-modernbert-base",
             sentiment_model: str = "finiteautomata/bertweet-base-sentiment-analysis",
             src_translator: str = "Helsinki-NLP/opus-mt-en-ROMANCE",
             tgt_translator: str = "Helsinki-NLP/opus-mt-ROMANCE-en",
@@ -43,7 +42,6 @@ class GraphBuilder:
             dataset_paths (Union[List[str], str]): Path(s) to the dataset(s).
             dataset_names (Union[str, List[str]]): Name(s) of the dataset(s).
             dataset_type (Literal['test', 'train', 'val', 'dev']): Type of dataset.
-            sentence_model (str): Name of the sentence embedding model.
             sentiment_model (str): Name of the sentiment analysis model.
         """
         # Ensure dataset_paths and dataset_names are lists
@@ -69,7 +67,6 @@ class GraphBuilder:
             self.dialogs.extend(load_dataset(path))
             logger.info(f"{name} dataset loaded successfully.")
 
-        self.sentence_model = SentenceTransformer(sentence_model, device=str(self.device))
         logger.info(f"Load pretrained sentiment analysis model: {sentiment_model}.")
         self.sentiment_model = pipeline("sentiment-analysis", model=sentiment_model, device=self.device)
 
@@ -88,8 +85,6 @@ class GraphBuilder:
         speakers = {}
         speakers_ids = []
 
-        text_embeddings = self.sentence_model.encode(edus, batch_size=BATCH_SIZE, convert_to_tensor=True,
-                                                     show_progress_bar=False).to(self.device)
         try:
             sentiments = self.sentiment_model(edus, batch_size=BATCH_SIZE)
         except IndexError:
@@ -107,11 +102,12 @@ class GraphBuilder:
             speakers_ids.append(speakers[speaker])
 
         speakers_ids = torch.tensor(speakers_ids, dtype=torch.int8, device=self.device)
-        sentiment_labels = sentiment_labels.unsqueeze(1).repeat(1, text_embeddings.shape[-1])
-        speakers_ids = speakers_ids.unsqueeze(1).repeat(1, text_embeddings.shape[-1])
+        sentiment_labels = sentiment_labels.unsqueeze(1)
+        speakers_ids = speakers_ids.unsqueeze(1)
 
-        node_features = torch.cat([text_embeddings, sentiment_labels, speakers_ids], dim=-1)
+        node_features = torch.cat([sentiment_labels, speakers_ids], dim=-1)
         graph_data["edu"].x = node_features
+        graph_data["edu"].edus = edus
 
         if str(self.device) != 'cpu':
             getattr(torch, str(self.device)).empty_cache()
@@ -135,11 +131,7 @@ class GraphBuilder:
             f"Starting graph construction for dataset/s {self.dataset_names}..."
         )
 
-        idx = 0
         for dialog in tqdm(self.dialogs, desc="Processing dialogs"):
-            idx += 1
-            if idx < 314:
-                continue
             augmented_edus = []
             edus = []
             speakers_list = []

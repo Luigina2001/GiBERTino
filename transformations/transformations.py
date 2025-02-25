@@ -19,7 +19,8 @@ def calculate_probability(n: int, p: float):
     return np.random.binomial(n=n, p=p)
 
 
-TGT_LANGS = ['fr', 'wa', 'frp', 'oc', 'ca', 'rm', 'lld', 'fur', 'lij', 'lmo', 'es', 'it', 'pt', 'gl', 'lad', 'an',
+TGT_LANGS = ['fr', 'wa', 'frp', 'oc', 'ca', 'rm', 'lld', 'fur', 'lij', 'lmo',
+             'es', 'it', 'pt', 'gl', 'lad', 'an',
              'mwl', 'co', 'nap', 'scn', 'vec', 'sc', 'ro', 'la']
 MAX_MODEL_LENGTH = 85  # max token length returned by the tokenizer on the longest sentence
 TOKENS_RANGE = 3
@@ -31,7 +32,8 @@ class BackTranslation:
     """
 
     def __init__(self, src_translator: str = "Helsinki-NLP/opus-mt-en-ROMANCE",
-                 tgt_translator: str = "Helsinki-NLP/opus-mt-ROMANCE-en", p: float = 0.5):
+                 tgt_translator: str = "Helsinki-NLP/opus-mt-ROMANCE-en",
+                 p: float = 0.5):
         """
         Initialize the BackTranslation module.
 
@@ -40,11 +42,14 @@ class BackTranslation:
             tgt_translator (str): Name of the model for target language translation.
             p (float): Probability of applying back translation.
         """
-        self.device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
+        self.device = "cuda" if torch.cuda.is_available() else (
+            "mps" if torch.backends.mps.is_available() else "cpu")
         self.p = p
-        self.src_translator = MarianMTModel.from_pretrained(src_translator).to(self.device)
+        self.src_translator = MarianMTModel.from_pretrained(src_translator).to(
+            self.device)
         self.src_tokenizer = MarianTokenizer.from_pretrained(src_translator)
-        self.tgt_translator = MarianMTModel.from_pretrained(tgt_translator).to(self.device)
+        self.tgt_translator = MarianMTModel.from_pretrained(tgt_translator).to(
+            self.device)
         self.tgt_tokenizer = MarianTokenizer.from_pretrained(tgt_translator)
 
     def translate(self, sample, back: bool = False):
@@ -58,22 +63,28 @@ class BackTranslation:
         Returns:
             str: Translated text.
         """
-        tokens = self.src_tokenizer(sample, return_tensors="pt", padding=True) if back is False else \
+        tokens = self.src_tokenizer(sample, return_tensors="pt",
+                                    padding=True) if back is False else \
             self.tgt_tokenizer(sample, return_tensors="pt", padding=True)
         tokens = tokens.to(self.device)
 
-        translated = self.src_translator.generate(**tokens, max_new_tokens=MAX_MODEL_LENGTH) if back is False else \
-            self.tgt_translator.generate(**tokens, max_new_tokens=MAX_MODEL_LENGTH)
+        translated = self.src_translator.generate(**tokens,
+                                                  max_new_tokens=MAX_MODEL_LENGTH) if back is False else \
+            self.tgt_translator.generate(**tokens,
+                                         max_new_tokens=MAX_MODEL_LENGTH)
 
         # if the translated sample contains more tokens than the specified threshold, return the original
         # sample
-        translated = translated if len(translated) <= (len(tokens) * TOKENS_RANGE) else tokens
+        translated = translated if len(translated) <= (
+                    len(tokens) * TOKENS_RANGE) else tokens
         translated = translated.to("cpu")
 
         # translated text
-        return [self.src_tokenizer.decode(t, skip_special_tokens=True) for t in translated][0] \
+        return [self.src_tokenizer.decode(t, skip_special_tokens=True) for t in
+                translated][0] \
             if back is not True else \
-            [self.tgt_tokenizer.decode(t, skip_special_tokens=True) for t in translated][0]
+            [self.tgt_tokenizer.decode(t, skip_special_tokens=True) for t in
+             translated][0]
 
     def __call__(self, sample: str):
         """
