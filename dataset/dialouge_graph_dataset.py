@@ -68,6 +68,7 @@ class DialogueGraphDataset(InMemoryDataset):
 
             new_graph = HeteroData()
             new_graph["edu"].x = graph["edu"].x
+            new_graph["edu"].edus = graph["edu"].edus
             # Structural edges (edges that define the graph)
             new_graph["edu", "to", "edu"].edge_index = edge_index
 
