@@ -4,13 +4,11 @@ import lightning as L
 import torch
 import torch.nn as nn
 import torch_geometric
-from transformers import AutoModel
+from transformers import AutoTokenizer, AutoModel
 
 from utils import print_metrics
 from utils.constants import NUM_RELATIONS
 from utils.metrics import Metrics
-
-from transformers import AutoTokenizer, AutoModel
 
 
 class GiBERTino(L.LightningModule):
@@ -88,18 +86,19 @@ class GiBERTino(L.LightningModule):
         for i in range(batch.batch_size):
             # the attention mask indices indicate which tokens are actual words (1)
             # and which are padding tokens (0)
-            input_mask_expanded = local_attention_masks[i].unsqueeze(-1).expand(
-                local_embeddings[i].shape).float()
+            input_mask_expanded = local_attention_masks[i].unsqueeze(-1).expand(local_embeddings[i].shape).float()
+            valid_local_tokens = local_embeddings[i] * input_mask_expanded
 
-            sum_embeddings = torch.sum(local_embeddings[i] * input_mask_expanded,
-                                       dim=1)
-            sum_mask = input_mask_expanded.sum(dim=1).clamp(min=1e-9)
-            global_embeddings = sum_embeddings / sum_mask
-            node_embeddings.append(torch.cat((local_embeddings[i], global_embeddings), dim=1))
+            cumulative_attention = input_mask_expanded.cumsum(dim=1)
+            contextualized_global_embeddings = torch.cumsum(valid_local_tokens, dim=1) / cumulative_attention
+            node_embeddings.append(torch.cat((local_embeddings[i], contextualized_global_embeddings), dim=1))
 
-
+        node_embeddings = torch.cat(node_embeddings, dim=0)
         x, edge_index = batch["edu"].x, batch["edu", "to", "edu"].edge_index
-        embeddings = self.model(x, edge_index)
+        x = x.unsqueeze(1).expand(-1, node_embeddings.shape[1], -1)
+        x = torch.cat((x, node_embeddings), dim=-1)
+        x = x.reshape(x.shape[0], -1)
+        embeddings = self.gnn_model(x, edge_index)
 
         link_logits = self._predict(embeddings, edge_index, 'link')
         rel_probs = self._predict(embeddings, edge_index, 'rel')
