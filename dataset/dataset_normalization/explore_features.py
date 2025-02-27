@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 
 import numpy as np
+from scipy import stats
+
 from utils import load_dataset
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -36,6 +38,49 @@ def explore_features(dataset, dataset_name):
         relation_types.update(rel["type"] for rel in entry["relations"])
     print("\nUnique relationship types in the dataset:")
     print(relation_types)
+
+
+def count_sentence_length(dataset_train, dataset_val, dataset_test, name):  # noqa
+    edus_len = []
+
+    output_folder = Path("sentences_length_plots")
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    for entry in dataset_train:
+        for edu in entry["edus"]:
+            edus_len.append(len(edu["text"]))
+
+    for entry in dataset_test:
+        for edu in entry["edus"]:
+            edus_len.append(len(edu["text"]))
+
+    for entry in dataset_val:
+        for edu in entry["edus"]:
+            edus_len.append(len(edu["text"]))
+
+    median = np.median(edus_len)
+    print(median)
+
+    mean = np.mean(edus_len)
+    print(mean)
+
+    data = edus_len
+    plt.hist(data, bins=30, density=True, alpha=0.6, color='b', edgecolor='black')
+
+    # Normal Distribution Curve
+    x = np.linspace(min(data), max(data), 1000)
+    pdf = stats.norm.pdf(x, np.mean(data), np.std(data))  # Probability density function
+    plt.plot(x, pdf, 'r', linewidth=2)  # Red curve
+
+    # Labels
+    plt.title('Normal Distribution Fit')
+    plt.xlabel('Data')
+    plt.ylabel('Density')
+
+    plt.tight_layout()
+    output_file = os.path.join(output_folder, f'{name}_sentence_length.png')
+    plt.savefig(output_file)
+    plt.close()
 
 
 def count_relationships(dataset):
@@ -211,14 +256,19 @@ if __name__ == "__main__":
     print(f"\n\n\n{final_global_relations}")
     print(len(final_global_relations))'''
 
-    print("\n\n" + "=" * 60 + " MERGED DATASETS " + "=" * 60 + "\n")
+    # print("\n\n" + "=" * 60 + " MERGED DATASETS " + "=" * 60 + "\n")
 
     datasets = {}
     final_global_relations = set()
     for name, path in merged_datasets.items():
         datasets[name] = load_dataset(path)
-        explore_features(datasets[name], name)
+        # explore_features(datasets[name], name)
 
-    compare_datasets(datasets)
-    print(f"\n\n\n{final_global_relations}")
-    print(len(final_global_relations))
+    count_sentence_length(load_dataset(merged_datasets["TRAIN"]),
+                          load_dataset(merged_datasets["VAL"]),
+                          load_dataset(merged_datasets["TEST"]),
+                          "sentence_len")
+
+    # compare_datasets(datasets)
+    # print(f"\n\n\n{final_global_relations}")
+    # print(len(final_global_relations))
