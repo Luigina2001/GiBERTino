@@ -40,46 +40,67 @@ def explore_features(dataset, dataset_name):
     print(relation_types)
 
 
-def count_sentence_length(dataset_train, dataset_val, dataset_test, name):  # noqa
-    edus_len = []
+def count_sentence_length(dataset_train, dataset_val, dataset_test, name):
+    # Combine all datasets for processing
+    all_datasets = [dataset_train, dataset_val, dataset_test]
 
+    # Collect EDU lengths using list comprehension
+    edus_len = [
+        len(edu["text"])
+        for dataset in all_datasets
+        for entry in dataset
+        for edu in entry["edus"]
+    ]
+
+    # Calculate statistics
+    median = np.median(edus_len)
+    mean = np.mean(edus_len)
+    std = np.std(edus_len)
+    max_pdf_value = stats.norm.pdf(mean, mean, std)  # Peak of normal curve
+
+    print(f"Median: {median}")
+    print(f"Mean: {mean}")
+    print(f"Standard Deviation: {std}")
+
+    # Create output directory
     output_folder = Path("sentences_length_plots")
     output_folder.mkdir(parents=True, exist_ok=True)
 
-    for entry in dataset_train:
-        for edu in entry["edus"]:
-            edus_len.append(len(edu["text"]))
+    # Initialize plot
+    plt.figure(figsize=(12, 7))
 
-    for entry in dataset_test:
-        for edu in entry["edus"]:
-            edus_len.append(len(edu["text"]))
+    # Plot histogram
+    plt.hist(edus_len, bins=30, density=True, alpha=0.6,
+             color='b', edgecolor='black', label='Real distribution')
 
-    for entry in dataset_val:
-        for edu in entry["edus"]:
-            edus_len.append(len(edu["text"]))
+    # Plot normal distribution curve
+    x = np.linspace(min(edus_len), max(edus_len), 1000)
+    pdf = stats.norm.pdf(x, mean, std)
+    plt.plot(x, pdf, 'r', linewidth=2, label='Normal distribution')
 
-    median = np.median(edus_len)
-    print(median)
+    # Highlight Gaussian curve peak
+    plt.scatter(mean, max_pdf_value, color='red', zorder=5, s=80,
+                label=f'Gaussian Peak: {max_pdf_value:.2f}')
 
-    mean = np.mean(edus_len)
-    print(mean)
+    # Add vertical lines for statistics
+    plt.axvline(float(mean), color='green', linestyle='--', linewidth=1.5, alpha=0.7, label=f'Mean: {mean:.1f}')
+    plt.axvline(float(median), color='purple', linestyle='-.', linewidth=1.5, alpha=0.7, label=f'Median: {median:.1f}')
 
-    data = edus_len
-    plt.hist(data, bins=30, density=True, alpha=0.6, color='b', edgecolor='black')
+    # Add standard deviation boundaries
+    plt.axvline(mean + std, color='orange', linestyle=':', linewidth=1.5, alpha=0.7, label=f'+1σ: {mean + std:.1f}')
+    plt.axvline(mean - std, color='orange', linestyle=':', linewidth=1.5, alpha=0.7, label=f'-1σ: {mean - std:.1f}')
 
-    # Normal Distribution Curve
-    x = np.linspace(min(data), max(data), 1000)
-    pdf = stats.norm.pdf(x, np.mean(data), np.std(data))  # Probability density function
-    plt.plot(x, pdf, 'r', linewidth=2)  # Red curve
-
-    # Labels
-    plt.title('Normal Distribution Fit')
-    plt.xlabel('Data')
+    # Configure plot appearance
+    plt.title(f'Distribution of sentence lengths - {name}')
+    plt.xlabel('Sentence lengths')
     plt.ylabel('Density')
+    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
+    plt.grid(True, alpha=0.3)
 
+    # Save and close plot
+    output_file = output_folder / f'{name}_sentence_length.png'
     plt.tight_layout()
-    output_file = os.path.join(output_folder, f'{name}_sentence_length.png')
-    plt.savefig(output_file)
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
 
 
@@ -227,26 +248,29 @@ def compare_datasets(datasets):  # noqa
 
 if __name__ == "__main__":
 
+    DATA_ROOT = Path("../../data")
     dataset_paths = {
-        "TEST_133": "../../data/MINECRAFT/TEST_133.json",
-        "TEST_101_bert": "../../data/MINECRAFT/TEST_101_bert.json",
-        "DEV_32_bert": "../../data/MINECRAFT/DEV_32_bert.json",
-        "TRAIN_307_bert": "../../data/MINECRAFT/TRAIN_307_bert.json",
-        "VAL_100_bert": "../../data/MINECRAFT/VAL_100_bert.json",
-        "MOLWENI_dev": "../../data/MOLWENI/dev.json",
-        "MOLWENI_test": "../../data/MOLWENI/test.json",
-        "MOLWENI_train": "../../data/MOLWENI/train.json",
-        "STAC_test": "../../data/STAC/test_subindex.json",
-        "STAC_train": "../../data/STAC/train_subindex.json",
+        "TEST_133": DATA_ROOT / "MINECRAFT/TEST_133.json",
+        "TEST_101_bert": DATA_ROOT / "MINECRAFT/TEST_101_bert.json",
+        "DEV_32_bert": DATA_ROOT / "MINECRAFT/DEV_32_bert.json",
+        "TRAIN_307_bert": DATA_ROOT / "MINECRAFT/TRAIN_307_bert.json",
+        "VAL_100_bert": DATA_ROOT / "MINECRAFT/VAL_100_bert.json",
+        "MOLWENI_dev": DATA_ROOT / "MOLWENI/dev.json",
+        "MOLWENI_test": DATA_ROOT / "MOLWENI/test.json",
+        "MOLWENI_train": DATA_ROOT / "MOLWENI/train.json",
+        "STAC_test": DATA_ROOT / "STAC/test_subindex.json",
+        "STAC_train": DATA_ROOT / "STAC/train_subindex.json",
     }
 
+    MERGED_ROOT = DATA_ROOT / "MERGED"
     merged_datasets = {
-        "TRAIN": "../../data/MERGED/train.json",
-        "VAL": "../../data/MERGED/val.json",
-        "TEST": "../../data/MERGED/test.json"
+        "TRAIN": MERGED_ROOT / "train.json",
+        "VAL": MERGED_ROOT / "val.json",
+        "TEST": MERGED_ROOT / "test.json",
     }
 
-    '''datasets = {}
+    '''
+    datasets = {}
     final_global_relations = set()
     for name, path in dataset_paths.items():
         datasets[name] = load_dataset(path)
@@ -256,7 +280,14 @@ if __name__ == "__main__":
     print(f"\n\n\n{final_global_relations}")
     print(len(final_global_relations))'''
 
-    # print("\n\n" + "=" * 60 + " MERGED DATASETS " + "=" * 60 + "\n")
+    train_data = load_dataset(str(merged_datasets["TRAIN"]))
+    val_data = load_dataset(str(merged_datasets["VAL"]))
+    test_data = load_dataset(str(merged_datasets["TEST"]))
+
+    count_sentence_length(train_data, val_data, test_data, "sentence_len")
+
+    '''
+    print("\n\n" + "=" * 60 + " MERGED DATASETS " + "=" * 60 + "\n")
 
     datasets = {}
     final_global_relations = set()
@@ -264,11 +295,6 @@ if __name__ == "__main__":
         datasets[name] = load_dataset(path)
         # explore_features(datasets[name], name)
 
-    count_sentence_length(load_dataset(merged_datasets["TRAIN"]),
-                          load_dataset(merged_datasets["VAL"]),
-                          load_dataset(merged_datasets["TEST"]),
-                          "sentence_len")
-
     # compare_datasets(datasets)
     # print(f"\n\n\n{final_global_relations}")
-    # print(len(final_global_relations))
+    # print(len(final_global_relations))'''
