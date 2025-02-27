@@ -10,6 +10,8 @@ from utils import print_metrics
 from utils.constants import NUM_RELATIONS
 from utils.metrics import Metrics
 
+from utils.constants import MAX_SENTENCE_LEN
+
 
 class GiBERTino(L.LightningModule):
     def __init__(self, gnn_model: Literal['GCN', 'GAT'], in_channels: int,
@@ -68,7 +70,9 @@ class GiBERTino(L.LightningModule):
         edu_indices = [len(edus) for edus in batch["edu"].edus]
         flat_edus = [edu for edus in batch["edu"].edus for edu in edus]
 
-        tokenized_edus = self.tokenizer(flat_edus, padding=True, return_tensors="pt")
+        tokenized_edus = self.tokenizer(flat_edus, padding=True,
+                                        return_tensors="pt", max_len=MAX_SENTENCE_LEN,
+                                        truncation=True)
         outputs = self.bert_model(**tokenized_edus)
         # the last hidden state contains token-level contextualized embeddings:
         # for each edu, we'll have an embedding for each token in the edu
