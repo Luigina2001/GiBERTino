@@ -5,15 +5,14 @@ from typing import Literal, Optional, Union, List
 
 import numpy as np
 import torch
-from sentence_transformers import SentenceTransformer
 from torch_geometric.data import HeteroData
 from tqdm import tqdm
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer
 from transformers.utils.logging import set_verbosity_error
 
 from transformations import BackTranslation
 from utils import load_dataset, display_graph, get_device
-from utils.constants import SENTIMENTS
+from utils.constants import SENTIMENTS, MAX_SENTENCE_LEN
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -30,6 +29,7 @@ class GraphBuilder:
             dataset_names: Union[str, List[str]],
             dataset_type: Literal["test", "train", "val"],
             sentiment_model: str = "finiteautomata/bertweet-base-sentiment-analysis",
+            tokenizer: str = 'Alibaba-NLP/gte-modernbert-base',
             src_translator: str = "Helsinki-NLP/opus-mt-en-ROMANCE",
             tgt_translator: str = "Helsinki-NLP/opus-mt-ROMANCE-en",
             p: float = 0.5,
@@ -66,6 +66,9 @@ class GraphBuilder:
             logger.info(f"Loading dataset from {path}")
             self.dialogs.extend(load_dataset(path))
             logger.info(f"{name} dataset loaded successfully.")
+
+        logger.info(f"Load tokenizer: {tokenizer}.")
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
 
         logger.info(f"Load pretrained sentiment analysis model: {sentiment_model}.")
         self.sentiment_model = pipeline("sentiment-analysis", model=sentiment_model, device=self.device)
@@ -107,7 +110,9 @@ class GraphBuilder:
 
         node_features = torch.cat([sentiment_labels, speakers_ids], dim=-1)
         graph_data["edu"].x = node_features
-        graph_data["edu"].edus = edus
+        graph_data["edu"].edus = self.tokenizer(edus, padding='max_length',
+                                                return_tensors="pt", max_length=MAX_SENTENCE_LEN,
+                                                truncation=True).to(self.device)
 
         if str(self.device) != 'cpu':
             getattr(torch, str(self.device)).empty_cache()

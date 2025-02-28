@@ -60,7 +60,6 @@ class GiBERTino(L.LightningModule):
         # save hyperparameters when saving checkpoint
         self.save_hyperparameters()
 
-
     def _predict(self, node_embeddings, edge_index, edge_rel,
                  predict: Literal['link', 'rel']):
         src, dst = edge_index
@@ -84,14 +83,11 @@ class GiBERTino(L.LightningModule):
         # AutoTokenizer expects a flat list of texts but the dataloader returns
         # a list of lists of texts
         # keep track of which edus correspond to which graph
-        edu_indices = [len(edus) for edus in batch["edu"].edus]
-        flat_edus = [edu for edus in batch["edu"].edus for edu in edus]
+        # edu_indices = [len(edus) for edus in batch["edu"].edus]
+        # flat_edus = [edu for edus in batch["edu"].edus for edu in edus]
         edge_rel = batch["edu", "to", "edu"].rel_labels
 
-        tokenized_edus = self.tokenizer(flat_edus, padding='max_length',
-                                        return_tensors="pt", max_length=MAX_SENTENCE_LEN,
-                                        truncation=True)
-        outputs = self.bert_model(**tokenized_edus)
+        outputs = self.bert_model(**batch["edu"].edus)
         # the last hidden state contains token-level contextualized embeddings:
         # for each edu, we'll have an embedding for each token in the edu
         # token-level embeddings correspond to local embeddings, in order to
@@ -100,8 +96,8 @@ class GiBERTino(L.LightningModule):
         flat_local_embeddings = outputs.last_hidden_state
 
         # get local embeddings per graph, returned as a tuple
-        local_embeddings = torch.split(flat_local_embeddings, edu_indices)
-        local_attention_masks = torch.split(tokenized_edus["attention_mask"], edu_indices)
+        # local_embeddings = torch.split(flat_local_embeddings, edu_indices)
+        # local_attention_masks = torch.split(tokenized_edus["attention_mask"], edu_indices)
 
         # node_embeddings = []
 
@@ -131,11 +127,8 @@ class GiBERTino(L.LightningModule):
         link_labels = batch["edu", "to", "edu"].link_labels.float()
         rel_labels = batch["edu", "to", "edu"].rel_labels
 
-        link_metrics = self.metrics.compute_metrics(link_logits, link_labels,
-                                                    'link', stage,
-                                                    self.global_step)
-        rel_metrics = self.metrics.compute_metrics(rel_probs, rel_labels, 'rel',
-                                                   stage, self.global_step)
+        link_metrics = self.metrics.compute_metrics(link_logits, link_labels,'link', stage, self.global_step)
+        rel_metrics = self.metrics.compute_metrics(rel_probs, rel_labels, 'rel', stage, self.global_step)
 
         self.metrics.log({'link_accuracy': link_metrics['link_accuracy'],
                           'rel_accuracy': rel_metrics['rel_accuracy']},
