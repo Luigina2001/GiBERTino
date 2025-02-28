@@ -70,8 +70,8 @@ class GiBERTino(L.LightningModule):
         edu_indices = [len(edus) for edus in batch["edu"].edus]
         flat_edus = [edu for edus in batch["edu"].edus for edu in edus]
 
-        tokenized_edus = self.tokenizer(flat_edus, padding=True,
-                                        return_tensors="pt", max_len=MAX_SENTENCE_LEN,
+        tokenized_edus = self.tokenizer(flat_edus, padding='max_length',
+                                        return_tensors="pt", max_length=MAX_SENTENCE_LEN,
                                         truncation=True)
         outputs = self.bert_model(**tokenized_edus)
         # the last hidden state contains token-level contextualized embeddings:
@@ -85,23 +85,22 @@ class GiBERTino(L.LightningModule):
         local_embeddings = torch.split(flat_local_embeddings, edu_indices)
         local_attention_masks = torch.split(tokenized_edus["attention_mask"], edu_indices)
 
-        node_embeddings = []
+        # node_embeddings = []
 
-        for i in range(batch.batch_size):
-            # the attention mask indices indicate which tokens are actual words (1)
-            # and which are padding tokens (0)
-            input_mask_expanded = local_attention_masks[i].unsqueeze(-1).expand(local_embeddings[i].shape).float()
-            valid_local_tokens = local_embeddings[i] * input_mask_expanded
+        # for i in range(batch.batch_size):
+        #     # the attention mask indices indicate which tokens are actual words (1)
+        #     # and which are padding tokens (0)
+        #     input_mask_expanded = local_attention_masks[i].unsqueeze(-1).expand(local_embeddings[i].shape).float()
+        #     valid_local_tokens = local_embeddings[i] * input_mask_expanded
+        #
+        #     cumulative_attention = input_mask_expanded.cumsum(dim=1)
+        #     contextualized_global_embeddings = torch.cumsum(valid_local_tokens, dim=1) / cumulative_attention
+        #     node_embeddings.append(torch.cat((local_embeddings[i], contextualized_global_embeddings), dim=1))
 
-            cumulative_attention = input_mask_expanded.cumsum(dim=1)
-            contextualized_global_embeddings = torch.cumsum(valid_local_tokens, dim=1) / cumulative_attention
-            node_embeddings.append(torch.cat((local_embeddings[i], contextualized_global_embeddings), dim=1))
-
-        node_embeddings = torch.cat(node_embeddings, dim=0)
+        # node_embeddings = torch.cat(node_embeddings, dim=0)
+        flat_local_embeddings = flat_local_embeddings.mean(dim=-1)
         x, edge_index = batch["edu"].x, batch["edu", "to", "edu"].edge_index
-        x = x.unsqueeze(1).expand(-1, node_embeddings.shape[1], -1)
-        x = torch.cat((x, node_embeddings), dim=-1)
-        x = x.reshape(x.shape[0], -1)
+        x = torch.cat((x, flat_local_embeddings), dim=-1)
         embeddings = self.gnn_model(x, edge_index)
 
         link_logits = self._predict(embeddings, edge_index, 'link')

@@ -70,7 +70,7 @@ trainer:
   default_root_dir: null
 model:
   gnn_model: GCN
-  in_channels: 2304
+  in_channels: 41
   hidden_channels: 50
   num_layers: 3
 data:
