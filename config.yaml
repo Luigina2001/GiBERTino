@@ -5,7 +5,7 @@ trainer:
   strategy: auto
   devices: auto
   num_nodes: 1
-  precision: null
+  precision: 64
   logger: null
   callbacks:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
@@ -36,7 +36,6 @@ trainer:
         train_time_interval: null
         every_n_epochs: null
         save_on_train_epoch_end: true
-        enable_version_counter: true
   fast_dev_run: false
   max_epochs: null
   min_epochs: null
@@ -70,8 +69,8 @@ trainer:
   reload_dataloaders_every_n_epochs: 0
   default_root_dir: null
 model:
-  model: GCN
-  in_channels: 2304
+  gnn_model: GCN
+  in_channels: 41
   hidden_channels: 50
   num_layers: 3
 data:

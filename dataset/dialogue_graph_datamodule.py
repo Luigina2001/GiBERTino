@@ -36,7 +36,7 @@ class SubDialogueDataModule(LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(self.val_data, batch_size=self.batch_size, num_workers=self.num_workers,
-                          shuffle=True, persistent_workers=True)
+                          shuffle=False, persistent_workers=True)
 
     def test_dataloader(self):
         return DataLoader(self.test_data, batch_size=self.batch_size, num_workers=self.num_workers,
