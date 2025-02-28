@@ -74,7 +74,7 @@ model:
   hidden_channels: 50
   num_layers: 3
 data:
-  root: data/BALANCED/graphs/
+  root: data/MOLWENI/graphs/
   batch_size: 32
   num_workers: 4
 optimizer: null

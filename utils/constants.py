@@ -24,7 +24,8 @@ SENTIMENTS = {
 EDGE_TYPES = [
     'Clarification_question', 'Explanation', 'Contrast', 'Comment',
     'Elaboration', 'Result', 'QAP', 'Correction', 'Narration',
-    'Acknowledgement', 'Q-Elab', 'Continuation'
+    'Acknowledgement', 'Q-Elab', 'Continuation', 'Confirmation_question',
+    'Conditional', 'Alternation', 'Parallel', 'Background', 'Sequence'
 ]
 
 NEGATIVE_SAMPLES_RATIO = 50

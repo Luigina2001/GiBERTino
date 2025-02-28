@@ -3,6 +3,7 @@ from typing import Literal, Optional
 import lightning as L
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch_geometric
 from transformers import AutoTokenizer, AutoModel
 
@@ -28,14 +29,21 @@ class GiBERTino(L.LightningModule):
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         self.bert_model = AutoModel.from_pretrained(bert_model)
 
+        # Embedding layer for relations
+        self.relation_embeddings = nn.Embedding(NUM_RELATIONS + 1, hidden_channels)
+
+        # Link prediction classifier
         self.link_classifier = nn.Sequential(
-            nn.Linear(hidden_channels * 2, hidden_channels),
+            # Input size: hidden_channels * 2 (src + dst) + 1 (cosine similarity)
+            nn.Linear(hidden_channels * 2 + 1, hidden_channels),
             nn.ReLU(),
             nn.Linear(hidden_channels, 1)
         )
 
+        # Relation prediction classifier
         self.rel_classifier = nn.Sequential(
-            nn.Linear(hidden_channels * 2, hidden_channels),
+            # Input size: hidden_channels * 2 (src + dst) + hidden_channels (relation embedding)
+            nn.Linear(hidden_channels * 2 + hidden_channels, hidden_channels),
             nn.ReLU(),
             nn.Linear(hidden_channels, NUM_RELATIONS + 1),
             nn.Softmax(dim=-1)
@@ -52,14 +60,23 @@ class GiBERTino(L.LightningModule):
         # save hyperparameters when saving checkpoint
         self.save_hyperparameters()
 
-    def _predict(self, node_embeddings, edge_index,
+
+    def _predict(self, node_embeddings, edge_index, edge_rel,
                  predict: Literal['link', 'rel']):
         src, dst = edge_index
         embeddings = torch.cat([node_embeddings[src], node_embeddings[dst]],
                                dim=-1)
 
         if predict == 'link':
+            # src_emb = F.normalize(node_embeddings[src], dim=-1)
+            # dst_emb = F.normalize(node_embeddings[dst], dim=-1)
+            cosine_sim = F.cosine_similarity(node_embeddings[src], node_embeddings[dst],
+                                             dim=-1, eps=1e-8).unsqueeze(-1)
+            embeddings = torch.cat([embeddings, cosine_sim], dim=-1)
             return self.link_classifier(embeddings).squeeze(dim=-1)
+
+        rel_emb = self.relation_embeddings(edge_rel)
+        embeddings = torch.cat([embeddings, rel_emb], dim=-1)
         return self.rel_classifier(embeddings)
 
     def forward(self, batch):
@@ -69,6 +86,7 @@ class GiBERTino(L.LightningModule):
         # keep track of which edus correspond to which graph
         edu_indices = [len(edus) for edus in batch["edu"].edus]
         flat_edus = [edu for edus in batch["edu"].edus for edu in edus]
+        edge_rel = batch["edu", "to", "edu"].rel_labels
 
         tokenized_edus = self.tokenizer(flat_edus, padding='max_length',
                                         return_tensors="pt", max_length=MAX_SENTENCE_LEN,
@@ -103,8 +121,8 @@ class GiBERTino(L.LightningModule):
         x = torch.cat((x, flat_local_embeddings), dim=-1)
         embeddings = self.gnn_model(x, edge_index)
 
-        link_logits = self._predict(embeddings, edge_index, 'link')
-        rel_probs = self._predict(embeddings, edge_index, 'rel')
+        link_logits = self._predict(embeddings, edge_index, edge_rel, 'link')
+        rel_probs = self._predict(embeddings, edge_index, edge_rel, 'rel')
 
         return link_logits, rel_probs
 
