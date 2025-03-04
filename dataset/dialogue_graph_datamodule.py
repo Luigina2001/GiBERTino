@@ -1,5 +1,8 @@
 import os
+import shutil
+import random
 
+import torch
 from lightning import LightningDataModule
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
@@ -23,36 +26,42 @@ class SubDialogueDataModule(LightningDataModule):
         self.val_data = None
         self.test_data = None
 
+    def move_val_samples(self):
+        train_path = os.path.join(self.root, "train")
+        val_path = os.path.join(self.root, "val")
+
+        if not os.path.exists(val_path):
+            os.makedirs(val_path, exist_ok=True)
+            all_train_files = [f for f in os.listdir(train_path) if f.endswith(".pt")]
+
+            val_size = int(len(all_train_files) * self.val_split_ratio)
+            val_files = random.sample(all_train_files, val_size)
+
+            for file in val_files:
+                src = os.path.join(train_path, file)
+                dst = os.path.join(val_path, file)
+                shutil.move(src, dst)
+
+            print(f"Moved {len(val_files)} files from train to val.")
+
     def setup(self, stage: str):
         if stage == "fit":
+            self.move_val_samples()
             self.train_data = DialogueGraphDataset(root=os.path.join(self.root, 'train'),
                                                    negative_sampling_ratio=self.negative_sampling_ratio)
-
-            val_path = os.path.join(self.root, 'val')
-            if os.path.exists(val_path) and os.path.isdir(val_path):
-                self.val_data = DialogueGraphDataset(root=val_path,
-                                                     negative_sampling_ratio=self.negative_sampling_ratio)
-            else:
-                val_size = int(len(self.train_data) * self.val_split_ratio)
-                train_size = len(self.train_data) - val_size
-
-                if val_size > 0:
-                    self.train_data, self.val_data = random_split(self.train_data, [train_size, val_size])
-                else:
-                    raise ValueError(
-                        "Validation dataset is empty. Adjust val_split_ratio or provide a validation dataset.")
-
+            self.val_data = DialogueGraphDataset(root=os.path.join(self.root, 'val'),
+                                                   negative_sampling_ratio=self.negative_sampling_ratio)
         if stage == "test":
             self.test_data = DialogueGraphDataset(root=os.path.join(self.root, 'test'))
 
     def train_dataloader(self):
         return DataLoader(self.train_data, batch_size=self.batch_size, num_workers=self.num_workers,
-                          shuffle=True, persistent_workers=True)
+                          shuffle=True)
 
     def val_dataloader(self):
         return DataLoader(self.val_data, batch_size=self.batch_size, num_workers=self.num_workers,
-                          shuffle=False, persistent_workers=True)
+                          shuffle=False)
 
     def test_dataloader(self):
         return DataLoader(self.test_data, batch_size=self.batch_size, num_workers=self.num_workers,
-                          shuffle=False, persistent_workers=True)
+                          shuffle=False)

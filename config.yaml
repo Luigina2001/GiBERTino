@@ -74,7 +74,7 @@ model:
   hidden_channels: 50
   num_layers: 3
 data:
-  root: data/MOLWENI/graphs/
+  root: data/MINECRAFT/graphs/
   batch_size: 32
   num_workers: 0
 optimizer: null

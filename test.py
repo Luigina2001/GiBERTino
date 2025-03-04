@@ -1,11 +1,13 @@
+import os
 import torch
+import json
 from dataset.dialogue_graph_datamodule import SubDialogueDataModule
 from model.GiBERTino import GiBERTino
 from utils.metrics import Metrics
 from utils.utils import get_device
 import lightning
 
-def test_model(checkpoint_path: str, data_path: str): # noqa
+def test_model(checkpoint_path: str, data_path: str, metrics_output_path: str = "test_metrics.json"): # noqa
     """
     Load the model from the checkpoint, perform classification on test data, and compute evaluation metrics.
     """
@@ -48,6 +50,7 @@ def test_model(checkpoint_path: str, data_path: str): # noqa
         test_loader = data_module.test_dataloader()
 
         metrics = Metrics()
+        all_metrics = []
 
         print("Running classification...")
         with torch.no_grad():
@@ -65,7 +68,7 @@ def test_model(checkpoint_path: str, data_path: str): # noqa
                 link_metrics = metrics.compute_metrics(link_logits, link_labels, 'link', 'test', 0)
                 rel_metrics = metrics.compute_metrics(rel_probs, rel_labels, 'rel', 'test', 0)
 
-                metrics.log({
+                batch_metrics = {
                     'link_accuracy': link_metrics['link_accuracy'],
                     'link_precision': link_metrics['link_precision'],
                     'link_recall': link_metrics['link_recall'],
@@ -76,7 +79,9 @@ def test_model(checkpoint_path: str, data_path: str): # noqa
                     'rel_recall': rel_metrics['rel_recall'],
                     'rel_f1': rel_metrics['rel_f1'],
                     'rel_roc': rel_metrics['rel_roc']
-                }, 'test', 0)
+                }
+                metrics.log(batch_metrics, 'test', 0)
+                all_metrics.append(batch_metrics)
 
         # Aggregate metrics over all batches
         aggregated_metrics = metrics.aggregate_metrics()
@@ -88,6 +93,17 @@ def test_model(checkpoint_path: str, data_path: str): # noqa
         print(f"Link Prediction Accuracy: {aggregated_metrics['link_accuracy']:.4f}")
         print(f"Relation Classification Accuracy: {aggregated_metrics['rel_accuracy']:.4f}")
 
+        # Save metrics to JSON file
+        results = {
+            "aggregated_metrics": aggregated_metrics,
+            "batch_metrics": all_metrics
+        }
+
+        os.makedirs(os.path.dirname(metrics_output_path), exist_ok=True)
+        with open(metrics_output_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=4) # noqa
+        print(f"Metrics saved to {metrics_output_path}")
+
         return aggregated_metrics
 
     except Exception as e:
@@ -97,6 +113,6 @@ def test_model(checkpoint_path: str, data_path: str): # noqa
 
 if __name__ == "__main__":
     lightning.seed_everything(42)
-    checkpoint_path = "lightning_logs/version_0/checkpoints/alibaba-modernbert-minecraft-epoch-epoch=19-val_loss=2.64.ckpt"
-    data_path = "./data/MOLWENI/graphs/"
+    checkpoint_path = "lightning_logs/version_1/checkpoints/alibaba-modernbert-stac-epoch-epoch=18.ckpt"
+    data_path = "./data/STAC/graphs/"
     test_model(checkpoint_path, data_path)
