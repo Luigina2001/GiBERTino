@@ -5,7 +5,7 @@ trainer:
   strategy: auto
   devices: auto
   num_nodes: 1
-  precision: 64
+  precision: 32
   logger: null
   callbacks:
     - class_path: lightning.pytorch.callbacks.EarlyStopping
@@ -24,7 +24,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
         dirpath: null
-        filename: null
+        filename: alibaba-modernbert-minecraft-epoch-{epoch:02d}
         monitor: val/loss
         verbose: true
         save_last: null
@@ -76,7 +76,7 @@ model:
 data:
   root: data/MOLWENI/graphs/
   batch_size: 32
-  num_workers: 4
+  num_workers: 0
 optimizer: null
 lr_scheduler: null
 ckpt_path: null

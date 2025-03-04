@@ -38,13 +38,12 @@ def test_model(checkpoint_path: str, data_path: str): # noqa
         print(f"Model parameters loaded from checkpoint: "
               f"in_channels={in_channels}, hidden_channels={hidden_channels}, num_layers={num_layers}")
 
-        model = GiBERTino(model="GCN", in_channels=in_channels, hidden_channels=hidden_channels, num_layers=num_layers)
-        model.load_state_dict(new_state_dict, strict=True)
+        model = GiBERTino.load_from_checkpoint(checkpoint_path, map_location=device)
         model.to(device)
         model.eval()
 
         print("Loading test data...")
-        data_module = SubDialogueDataModule(data_path)
+        data_module = SubDialogueDataModule(data_path, num_workers=0)
         data_module.setup(stage="test")
         test_loader = data_module.test_dataloader()
 
@@ -98,6 +97,6 @@ def test_model(checkpoint_path: str, data_path: str): # noqa
 
 if __name__ == "__main__":
     lightning.seed_everything(42)
-    checkpoint_path = "aaa-epoch=29-val_loss=0.00.ckpt"
-    data_path = "./data/BALANCED/graphs/"
+    checkpoint_path = "lightning_logs/version_0/checkpoints/alibaba-modernbert-minecraft-epoch-epoch=19-val_loss=2.64.ckpt"
+    data_path = "./data/MOLWENI/graphs/"
     test_model(checkpoint_path, data_path)
