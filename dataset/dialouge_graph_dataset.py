@@ -19,7 +19,7 @@ class DialogueGraphDataset(InMemoryDataset):
 
         super().__init__(root, transform, pre_transform, pre_filter)
 
-        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False, map_location=self.device)
 
     @property
     def processed_file_names(self):

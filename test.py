@@ -1,36 +1,28 @@
+import argparse
 import os
 import torch
 import json
+
+from tqdm import tqdm
+
 from dataset.dialogue_graph_datamodule import SubDialogueDataModule
 from model.GiBERTino import GiBERTino
 from utils.metrics import Metrics
 from utils.utils import get_device
 import lightning
 
-def test_model(checkpoint_path: str, data_path: str, metrics_output_path: str = "test_metrics.json"): # noqa
+
+def test_model(args):  # noqa
     """
     Load the model from the checkpoint, perform classification on test data, and compute evaluation metrics.
     """
+    lightning.seed_everything(args.seed)
+    os.makedirs(args.eval_dir, exist_ok=True)
+
     device = get_device()
-    print(f"Loading model from checkpoint: {checkpoint_path}")
+    print(f"Loading model from checkpoint: {args.checkpoint_path}")
     try:
-        checkpoint = torch.load(checkpoint_path, map_location=device)
-        # print(checkpoint.keys())
-        # print(checkpoint["hyper_parameters"])
-        state_dict = checkpoint["state_dict"]  # Extract only the model weights
-
-        new_state_dict = {}
-
-        # TODO: to remove
-        for key, value in state_dict.items():
-            if "link_predictor" in key:
-                new_key = key.replace("link_predictor", "link_classifier")
-            elif "relation_predictor" in key:
-                new_key = key.replace("relation_predictor", "rel_classifier")
-            else:
-                new_key = key
-            new_state_dict[new_key] = value
-
+        checkpoint = torch.load(args.checkpoint_path, map_location=device)
         # Extract model parameters from the checkpoint
         model_config = checkpoint.get("hyper_parameters", {})
         in_channels = model_config.get("in_channels", 2304)
@@ -40,27 +32,24 @@ def test_model(checkpoint_path: str, data_path: str, metrics_output_path: str = 
         print(f"Model parameters loaded from checkpoint: "
               f"in_channels={in_channels}, hidden_channels={hidden_channels}, num_layers={num_layers}")
 
-        model = GiBERTino.load_from_checkpoint(checkpoint_path, map_location=device)
+        model = GiBERTino.load_from_checkpoint(args.checkpoint_path, map_location=device)
         model.to(device)
         model.eval()
 
         print("Loading test data...")
-        data_module = SubDialogueDataModule(data_path, num_workers=0)
+        data_module = SubDialogueDataModule(args.data_path, num_workers=0)
         data_module.setup(stage="test")
         test_loader = data_module.test_dataloader()
 
-        metrics = Metrics()
+        metrics = Metrics(log_dir=args.eval_dir)
         all_metrics = []
 
         print("Running classification...")
         with torch.no_grad():
-            for batch in test_loader:
+            for batch in tqdm(test_loader, desc="Processing test data"):
                 batch = {k: v.to(device) for k, v in batch.items()} if isinstance(batch, dict) else batch.to(device)
 
                 link_logits, rel_probs = model(batch)
-
-                # print(f"Batch_keys: {batch.keys()}")
-                # print(f"Batch[('edu', 'to', 'edu')]: {batch[('edu', 'to', 'edu')]}")
 
                 link_labels = batch[('edu', 'to', 'edu')].get('link_labels', None)
                 rel_labels = batch[('edu', 'to', 'edu')].get('rel_labels', None)
@@ -89,20 +78,33 @@ def test_model(checkpoint_path: str, data_path: str, metrics_output_path: str = 
         print("Test results:")
         for key, value in aggregated_metrics.items():
             print(f"{key}: {value:.4f}")
+
         print("\nAggregate metrics:")
         print(f"Link Prediction Accuracy: {aggregated_metrics['link_accuracy']:.4f}")
         print(f"Relation Classification Accuracy: {aggregated_metrics['rel_accuracy']:.4f}")
 
-        # Save metrics to JSON file
-        results = {
-            "aggregated_metrics": aggregated_metrics,
-            "batch_metrics": all_metrics
-        }
+        eval_path = os.path.join(args.eval_dir, args.eval_file)
 
-        os.makedirs(os.path.dirname(metrics_output_path), exist_ok=True)
-        with open(metrics_output_path, "w", encoding="utf-8") as f:
-            json.dump(results, f, indent=4) # noqa
-        print(f"Metrics saved to {metrics_output_path}")
+        header = "Model;Dataset;" + ";".join(aggregated_metrics.keys()) + "\n"
+
+        # Check if the header exists
+        if os.path.exists(eval_path):
+            with open(eval_path, "r", encoding="utf-8") as f:
+                first_line = f.readline().strip()
+        else:
+            first_line = ""
+
+        # Open file in append mode and write data
+        with open(eval_path, "a", encoding="utf-8") as f:
+            if first_line != header.strip():  # Avoid duplicate headers
+                f.write(header)
+
+            f.write(
+                f"{args.model_name};{args.dataset_name};" +
+                ";".join(f"{c:.5f}" for c in aggregated_metrics.values()) + "\n"
+            )
+
+        print(f"Metrics saved to {eval_path}")
 
         return aggregated_metrics
 
@@ -112,7 +114,14 @@ def test_model(checkpoint_path: str, data_path: str, metrics_output_path: str = 
 
 
 if __name__ == "__main__":
-    lightning.seed_everything(42)
-    checkpoint_path = "lightning_logs/version_4/checkpoints/alibaba-modernbert-minecraft-epoch-epoch=19.ckpt"
-    data_path = "./data/MINECRAFT/graphs/"
-    test_model(checkpoint_path, data_path)
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--eval_dir", type=str, default=os.path.join(os.getcwd(), "eval_results"))
+    parser.add_argument("--eval_file", type=str, default="scores.csv")
+    parser.add_argument("--checkpoint_path", type=str, help="Path of the model to evaluate", required=True)
+    parser.add_argument("--data_path", type=str, required=True)
+    parser.add_argument("--model_name", type=str, required=True)
+    parser.add_argument("--dataset_name", type=str, required=True)
+
+    test_model(parser.parse_args())
