@@ -70,6 +70,10 @@ class GraphBuilder:
         logger.info(f"Load tokenizer: {tokenizer}.")
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
 
+        if self.tokenizer.pad_token is None:
+            logger.info(f"Tokenizer pad token to {self.tokenizer.pad_token}.")
+            self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+
         logger.info(f"Load pretrained sentiment analysis model: {sentiment_model}.")
         self.sentiment_model = pipeline("sentiment-analysis", model=sentiment_model, device=self.device)
 
