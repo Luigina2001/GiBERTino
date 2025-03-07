@@ -24,7 +24,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
         dirpath: null
-        filename: alibaba-modernbert-minecraft-epoch-{epoch:02d}
+        filename: alibaba-modernbert-stac-epoch-{epoch:02d}
         monitor: val/loss
         verbose: true
         save_last: null

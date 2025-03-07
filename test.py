@@ -113,6 +113,6 @@ def test_model(checkpoint_path: str, data_path: str, metrics_output_path: str = 
 
 if __name__ == "__main__":
     lightning.seed_everything(42)
-    checkpoint_path = "lightning_logs/version_1/checkpoints/alibaba-modernbert-stac-epoch-epoch=18.ckpt"
-    data_path = "./data/STAC/graphs/"
+    checkpoint_path = "lightning_logs/version_4/checkpoints/alibaba-modernbert-minecraft-epoch-epoch=19.ckpt"
+    data_path = "./data/MINECRAFT/graphs/"
     test_model(checkpoint_path, data_path)
