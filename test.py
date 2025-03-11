@@ -22,7 +22,7 @@ def test_model(args):  # noqa
     device = get_device()
     print(f"Loading model from checkpoint: {args.checkpoint_path}")
     try:
-        checkpoint = torch.load(args.checkpoint_path, map_location=device)
+        checkpoint = torch.load(args.checkpoint_path, map_location=device, weights_only=False)
         # Extract model parameters from the checkpoint
         model_config = checkpoint.get("hyper_parameters", {})
         in_channels = model_config.get("in_channels", 2304)
