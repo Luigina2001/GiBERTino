@@ -11,14 +11,13 @@ from utils import print_metrics
 from utils.constants import NUM_RELATIONS
 from utils.metrics import Metrics
 
-from utils.constants import MAX_SENTENCE_LEN
-
 
 class GiBERTino(L.LightningModule):
     def __init__(self, gnn_model: Literal['GCN', 'GAT'], in_channels: int,
                  hidden_channels: int, num_layers: int,
                  tokenizer: str = 'Alibaba-NLP/gte-modernbert-base',
                  bert_model: str = 'Alibaba-NLP/gte-modernbert-base',
+                 lr: float = 1e-3,
                  checkpoint_path: Optional[str] = None):
         super().__init__()
 
@@ -56,6 +55,8 @@ class GiBERTino(L.LightningModule):
         self.rel_loss = torch.nn.CrossEntropyLoss()
 
         self.metrics = Metrics()
+
+        self.lr = lr
 
         # save hyperparameters when saving checkpoint
         self.save_hyperparameters()
@@ -167,7 +168,7 @@ class GiBERTino(L.LightningModule):
         return self.compute_loss(batch, 'val')
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(params=self.parameters())
+        optimizer = torch.optim.AdamW(lr=self.lr, params=self.parameters())
         lr_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer)
 
         return {
