@@ -169,29 +169,39 @@ def evaluate_model(**kwargs):
     Returns:
         float: The negative of the best validation loss, suitable for maximization in optimization tasks.
     """
-    with open("config.yaml", "r") as f:
-        config = yaml.safe_load(f)
+    # with open("config.yaml", "r") as f:
+    #     config = yaml.safe_load(f)
+    #
+    # try:
+    #     config["model"]["hidden_channels"] = int(kwargs["hidden_channels"])
+    #     config["model"]["num_layers"] = int(kwargs["num_layers"])
+    #     config["data"]["batch_size"] = int(kwargs["batch_size"])
+    #
+    #     config["optimizer"] = {
+    #         "class_path": "torch.optim.AdamW",
+    #         "init_args": {"lr": float(kwargs["learning_rate"])}
+    #     }
+    # except (KeyError, ValueError, TypeError) as e:
+    #     logger.error(f"Error updating config.yaml with Bayesian Optimization parameters: {e}")
+    #     return float("inf")
+    #
+    # with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as temp_config:
+    #     yaml.dump(config, temp_config)
+    #     temp_config_path = temp_config.name
+    #
+    # logger.info(f"Running training with config: {temp_config_path}")
 
-    try:
-        config["model"]["hidden_channels"] = int(kwargs["hidden_channels"])
-        config["model"]["num_layers"] = int(kwargs["num_layers"])
-        config["data"]["batch_size"] = int(kwargs["batch_size"])
-        config["optimizer"] = {
-            "class_path": "torch.optim.AdamW",
-            "init_args": {"lr": float(kwargs["learning_rate"])}
-        }
-    except (KeyError, ValueError, TypeError) as e:
-        logger.error(f"Error updating config.yaml with Bayesian Optimization parameters: {e}")
-        return float("inf")
+    run_parameters_args = f""
+    for key, param_value in kwargs.items():
+        run_parameters_args += f"--{key} {get_parameter_value(key, param_value)} "
 
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as temp_config:
-        yaml.dump(config, temp_config)
-        temp_config_path = temp_config.name
+    run_parameters_args = run_parameters_args.rstrip()
 
-    logger.info(f"Running training with config: {temp_config_path}")
+    logger.info(f"running {script_to_run} with config {config_file} and parameters: {run_parameters_args}")
 
     os.system(
-        f"python train.py fit --config {temp_config_path} --trainer.default_root_dir {args.default_root_dir}"
+        f"python train.py fit --config {config_file} {run_parameters_args} --trainer.default_root_dir "
+        f"{args.default_root_dir} --data.root {args.data_dir}"
     )
     # navigate to the trainer's default root dir, get the latest version, find the checkpoint and pick the best val_loss
 
@@ -262,6 +272,7 @@ if __name__ == "__main__":
     parser.add_argument("--default_root_dir", type=str, default=os.getcwd())
     parser.add_argument("--logs_dir", type=str, default="lightning_logs")
     parser.add_argument("--grid_file", type=str, default="hyperparam_grid.yaml")
+    parser.add_argument("--data_dir", type=str, required=True)
     parser.add_argument("--n_iter", type=int, default=10)
     parser.add_argument("--n_init_points", type=int, default=5)
     parser.add_argument("--random_state", type=int, default=42)
@@ -281,12 +292,12 @@ if __name__ == "__main__":
                                      verbose=2,
                                      random_state=args.random_state)
 
-    logger = JSONLogger(path=args.bayesian_runs_export_file)
-    optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
+    json_logger = JSONLogger(path=args.bayesian_runs_export_file)
+    optimizer.subscribe(Events.OPTIMIZATION_STEP, json_logger)
 
     if args.bayesian_runs_import_file:
         load_logs(optimizer, logs=[args.bayesian_runs_import_file])
     else:
         optimizer.maximize(init_points=args.n_init_points, n_iter=args.n_iter)
 
-    print("Best result: {}; f(x) = {}.".format(optimizer.max["params"], optimizer.max["target"]))
+    logger.info("Best result: {}; f(x) = {}.".format(optimizer.max["params"], optimizer.max["target"]))
