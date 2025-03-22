@@ -269,7 +269,7 @@ if __name__ == "__main__":
         "TEST": MERGED_ROOT / "test.json",
     }
 
-    '''
+
     datasets = {}
     final_global_relations = set()
     for name, path in dataset_paths.items():
@@ -278,13 +278,13 @@ if __name__ == "__main__":
 
     compare_datasets(datasets)
     print(f"\n\n\n{final_global_relations}")
-    print(len(final_global_relations))'''
+    print(len(final_global_relations))
 
-    train_data = load_dataset(str(merged_datasets["TRAIN"]))
-    val_data = load_dataset(str(merged_datasets["VAL"]))
-    test_data = load_dataset(str(merged_datasets["TEST"]))
+    # train_data = load_dataset(str(merged_datasets["TRAIN"]))
+    # val_data = load_dataset(str(merged_datasets["VAL"]))
+    # test_data = load_dataset(str(merged_datasets["TEST"]))
 
-    count_sentence_length(train_data, val_data, test_data, "sentence_len")
+    # count_sentence_length(train_data, val_data, test_data, "sentence_len")
 
     '''
     print("\n\n" + "=" * 60 + " MERGED DATASETS " + "=" * 60 + "\n")

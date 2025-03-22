@@ -13,7 +13,7 @@ from utils.metrics import Metrics
 
 
 class GiBERTino(L.LightningModule):
-    def __init__(self, gnn_model: Literal['GCN', 'GAT'], in_channels: int,
+    def __init__(self, gnn_model: Literal['GCN', 'GAT', 'GraphSAGE'], in_channels: int,
                  hidden_channels: int, num_layers: int,
                  tokenizer: str = 'Alibaba-NLP/gte-modernbert-base',
                  bert_model: str = 'Alibaba-NLP/gte-modernbert-base',
