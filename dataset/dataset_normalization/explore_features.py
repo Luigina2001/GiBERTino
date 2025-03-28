@@ -269,7 +269,6 @@ if __name__ == "__main__":
         "TEST": MERGED_ROOT / "test.json",
     }
 
-
     datasets = {}
     final_global_relations = set()
     for name, path in dataset_paths.items():

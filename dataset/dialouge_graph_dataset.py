@@ -1,20 +1,22 @@
 import os
 import random
-from typing import Union, List, Tuple
-
-import torch
-import numpy as np
-
-from torch_geometric.data import InMemoryDataset, HeteroData
-from utils import get_device, encode_relation_type
-from utils.constants import NEGATIVE_SAMPLES_RATIO, NUM_RELATIONS
 from itertools import permutations
+
+import numpy as np
+import torch
+from torch_geometric.data import InMemoryDataset, HeteroData
+
+from utils import get_device
+from utils.constants import NEGATIVE_SAMPLES_RATIO, RELATIONS
 
 
 class DialogueGraphDataset(InMemoryDataset):
-    def __init__(self, root: str, negative_sampling_ratio: float = NEGATIVE_SAMPLES_RATIO, transform=None,
-                 pre_transform=None, pre_filter=None):
+    def __init__(self, root: str, dataset_name: str, negative_sampling_ratio: float = NEGATIVE_SAMPLES_RATIO,
+                 transform=None, pre_transform=None, pre_filter=None):
         self.device = get_device()
+        self.dataset_name = dataset_name
+        self.relations = RELATIONS[dataset_name]
+        self.num_relations = len(self.relations) + 1
         self.negative_sampling_ratio = negative_sampling_ratio
 
         super().__init__(root, transform, pre_transform, pre_filter)
@@ -48,7 +50,7 @@ class DialogueGraphDataset(InMemoryDataset):
             for edge_type in graph.edge_types:
                 graph_edge_index = graph[edge_type[1]].edge_index
                 pos_edges.extend(graph_edge_index.t().tolist())
-                rel_labels.extend([encode_relation_type(edge_type[1])] * graph_edge_index.shape[1])
+                rel_labels.extend([self.encode_relation_type(edge_type[1])] * graph_edge_index.shape[1])
 
             # generate all possible edges and sample negative edges
             num_nodes = graph["edu"].x.shape[0]
@@ -64,7 +66,7 @@ class DialogueGraphDataset(InMemoryDataset):
             # label: 1 for pos, 0 for neg
             link_labels = torch.tensor(np.array([1] * len(pos_edges) + [0] * len(neg_edges)), dtype=torch.long)
             # label: [0-11] for pos, 12 for neg
-            rel_labels = torch.tensor(np.array(rel_labels + [NUM_RELATIONS] * len(neg_edges)), dtype=torch.long)
+            rel_labels = torch.tensor(np.array(rel_labels + [self.num_relations] * len(neg_edges)), dtype=torch.long)
 
             new_graph = HeteroData()
             new_graph["edu"].x = graph["edu"].x
@@ -80,3 +82,8 @@ class DialogueGraphDataset(InMemoryDataset):
 
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
+
+    def encode_relation_type(self, edge_type: str) -> int:  # noqa
+        if edge_type not in self.relations:
+            raise ValueError(f"Unknown relation type: {edge_type}")
+        return self.relations.index(edge_type)

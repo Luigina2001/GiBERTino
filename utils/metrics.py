@@ -7,12 +7,12 @@ from sentence_transformers.util import cos_sim
 from torch.utils.tensorboard import SummaryWriter
 from lightning.pytorch.loggers import TensorBoardLogger
 
-from .constants import NUM_RELATIONS, BATCH_SIZE, METRICS
+from .constants import BATCH_SIZE, METRICS
 from .utils import get_device
 
 
 class Metrics:
-    def __init__(self, num_classes: int = NUM_RELATIONS + 1,
+    def __init__(self, num_classes: int,
                  sentence_model: str = 'Alibaba-NLP/gte-modernbert-base',
                  log_dir: str = "lightning_logs", logger_name: str = "GiBERTino"):
 

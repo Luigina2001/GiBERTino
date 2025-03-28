@@ -8,7 +8,7 @@ import torch_geometric
 from transformers import AutoTokenizer, AutoModel
 
 from utils import print_metrics
-from utils.constants import NUM_RELATIONS
+from utils.constants import BALANCED, RELATIONS
 from utils.metrics import Metrics
 
 
@@ -18,6 +18,7 @@ class GiBERTino(L.LightningModule):
                  tokenizer: str = 'Alibaba-NLP/gte-modernbert-base',
                  bert_model: str = 'Alibaba-NLP/gte-modernbert-base',
                  lr: float = 1e-3,
+                 relations: int = BALANCED,
                  checkpoint_path: Optional[str] = None):
         super().__init__()
 
@@ -29,7 +30,8 @@ class GiBERTino(L.LightningModule):
         self.bert_model = AutoModel.from_pretrained(bert_model)
 
         # Embedding layer for relations
-        self.relation_embeddings = nn.Embedding(NUM_RELATIONS + 1, hidden_channels)
+        NUM_RELATIONS = len(RELATIONS[relations]) + 1
+        self.relation_embeddings = nn.Embedding(NUM_RELATIONS, hidden_channels)
 
         # Link prediction classifier
         self.link_classifier = nn.Sequential(
@@ -44,7 +46,7 @@ class GiBERTino(L.LightningModule):
             # Input size: hidden_channels * 2 (src + dst) + hidden_channels (relation embedding)
             nn.Linear(hidden_channels * 2 + hidden_channels, hidden_channels),
             nn.ReLU(),
-            nn.Linear(hidden_channels, NUM_RELATIONS + 1),
+            nn.Linear(hidden_channels, NUM_RELATIONS),
             nn.Softmax(dim=-1)
         )
 
@@ -54,7 +56,7 @@ class GiBERTino(L.LightningModule):
         self.link_loss = torch.nn.BCEWithLogitsLoss()
         self.rel_loss = torch.nn.CrossEntropyLoss()
 
-        self.metrics = Metrics()
+        self.metrics = Metrics(NUM_RELATIONS)
 
         self.lr = lr
 
@@ -128,7 +130,7 @@ class GiBERTino(L.LightningModule):
         link_labels = batch["edu", "to", "edu"].link_labels.float()
         rel_labels = batch["edu", "to", "edu"].rel_labels
 
-        link_metrics = self.metrics.compute_metrics(link_logits, link_labels,'link', stage, self.global_step)
+        link_metrics = self.metrics.compute_metrics(link_logits, link_labels, 'link', stage, self.global_step)
         rel_metrics = self.metrics.compute_metrics(rel_probs, rel_labels, 'rel', stage, self.global_step)
 
         self.metrics.log({'link_accuracy': link_metrics['link_accuracy'],
