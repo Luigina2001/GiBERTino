@@ -74,12 +74,13 @@ model:
   in_channels: 41
   hidden_channels: 64
   num_layers: 32
-  tokenizer: microsoft/DialoGPT-small
-  bert_model: microsoft/DialoGPT-small
+  tokenizer: Alibaba-NLP/gte-modernbert-base
+  bert_model: Alibaba-NLP/gte-modernbert-base
   lr: 1.0e-05
   checkpoint_path: null
 data:
   root: data/MOLWENI/alibaba-graphs
+  dataset_name: MOLWENI
   batch_size: 32
   num_workers: 0
   negative_sampling_ratio: 50

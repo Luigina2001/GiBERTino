@@ -13,7 +13,6 @@ from torch_geometric.utils.convert import to_networkx
 from rich.console import Console
 from rich.table import Table
 
-
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -98,6 +97,7 @@ def display_graph(graph: HeteroData, dataset_name: Optional[str] = None):
 
     except Exception as e:
         logger.warning(f"Failed to display graph: {e}.")
+
 
 def get_device():
     return torch.device(

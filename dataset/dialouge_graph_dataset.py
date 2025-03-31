@@ -62,7 +62,7 @@ class DialogueGraphDataset(InMemoryDataset):
 
             # combine positive and negative edges
             edges = np.array(pos_edges + neg_edges)
-            edge_index = torch.tensor(np.array(edges), dtype=torch.long).T
+            edge_index = torch.tensor(edges, dtype=torch.long).T
             # label: 1 for pos, 0 for neg
             link_labels = torch.tensor(np.array([1] * len(pos_edges) + [0] * len(neg_edges)), dtype=torch.long)
             # label: [0-11] for pos, 12 for neg
