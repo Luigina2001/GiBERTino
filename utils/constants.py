@@ -101,3 +101,24 @@ RELATIONS = {
         "Narration",
     ]
 }
+
+RELATIONS_COLOR_MAPS = {
+    "Comment": "#FF5733",  # Reddish Orange
+    "Elaboration": "#33A1FF",  # Light Blue
+    "QAP": "#33FF57",  # Green
+    "Q-Elab": "#FFC300",  # Yellow
+    "Explanation": "#C70039",  # Deep Red
+    "Result": "#900C3F",  # Dark Purple
+    "Continuation": "#581845",  # Dark Violet
+    "Acknowledgement": "#8E44AD",  # Purple
+    "Contrast": "#2E86C1",  # Blue
+    "Conditional": "#27AE60",  # Dark Green
+    "Correction": "#E74C3C",  # Red
+    "Background": "#1ABC9C",  # Teal
+    "Parallel": "#D35400",  # Orange
+    "Alternation": "#F39C12",  # Gold
+    "Clarification_question": "#3498DB",  # Sky Blue
+    "Narration": "#2C3E50",  # Dark Blue
+    "Confirmation_question": "#FF33A8",  # Pink
+    "Sequence": "#76448A",  # Deep Purple
+}
