@@ -1,7 +1,11 @@
 import json
 import random
 import logging
+import os
+import imageio.v2 as imageio
 from typing import Optional, List
+import shutil
+import uuid
 
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
@@ -33,7 +37,7 @@ def save_dataset(dataset, path):
 
 
 def create_graph_from_predictions(graph: HeteroData, relations: List[str], preds: torch.Tensor,
-                                  display_graphs: bool = True):
+                                  display_graphs: bool = True) -> HeteroData:
     preds = torch.sigmoid(preds)
     preds = (preds > 0.5).float()
 
@@ -46,7 +50,7 @@ def create_graph_from_predictions(graph: HeteroData, relations: List[str], preds
 
     for rel_type in rel_labels:
         new_graph["edu", relations[rel_type], "edu"].edge_index = edge_index[
-            (rel_labels == rel_type).nonzero(as_tuple=True)[0].tolist()].T.contiguous()
+            (rel_labels == rel_type).nonzero(as_tuple=True)[0].tolist()].T.contiguous()  # noqa
 
     graph_rel_labels = graph["edu", "to", "edu"].rel_labels
     graph_edge_index = graph["edu", "to", "edu"].edge_index.T
@@ -54,7 +58,7 @@ def create_graph_from_predictions(graph: HeteroData, relations: List[str], preds
 
     for rel_type in graph_rel_labels:
         graph["edu", relations[rel_type], "edu"].edge_index = graph_edge_index[
-            (rel_labels == rel_type).nonzero(as_tuple=True)[0].tolist()].T.contiguous()
+            (rel_labels == rel_type).nonzero(as_tuple=True)[0].tolist()].T.contiguous()  # noqa
 
     if display_graphs:
         fig, axs = plt.subplots(1, 2, figsize=(15, 5))
@@ -66,6 +70,113 @@ def create_graph_from_predictions(graph: HeteroData, relations: List[str], preds
         plt.sca(axs[1])
         display_graph(new_graph, ax=axs[1])
         axs[1].set_title("Predicted Discourse Graph")
+
+    return new_graph
+
+
+def create_gif_from_graphs(g: nx, new_graph: nx, all_paths: List, filename: str = "graph_evolution.gif"):
+    temp_dir = "temp_frames"
+    frames = []
+
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Convert input graphs to NetworkX format
+    G_real = to_networkx(g, to_undirected=False)
+    G_pred = to_networkx(new_graph, to_undirected=False)
+
+    pos = nx.spring_layout(G_real, seed=42)
+
+    plt.rcParams.update({
+        'font.size': 12,
+        'axes.edgecolor': '#cccccc',
+        'axes.labelcolor': '#666666',
+        'figure.facecolor': 'white',
+        'savefig.transparent': False
+    })
+
+    NODE_SIZE = 800
+    EDGE_WIDTH = 1.5
+    HIGHLIGHT_WIDTH = 3
+    COLOR_PALETTE = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#f4a261', '#e76f51', '#2a9d8f', '#264653']
+
+    def draw_graph(G, highlighted_edges=[], title="", path_num=0):  # noqa
+        plt.figure(figsize=(10, 8))
+
+        # Draw nodes
+        nx.draw_networkx_nodes(G, pos, node_color='#66b3ff',
+                               node_size=NODE_SIZE, alpha=0.9)
+        nx.draw_networkx_labels(G, pos, font_size=12, font_weight='bold')
+
+        # Draw normal edges
+        nx.draw_networkx_edges(G, pos, width=EDGE_WIDTH,
+                               edge_color='#cccccc', arrows=True)
+
+        # Highlight specific edges
+        if highlighted_edges:
+            edge_color = COLOR_PALETTE[path_num % len(COLOR_PALETTE)]
+            nx.draw_networkx_edges(
+                G, pos, edgelist=highlighted_edges,
+                edge_color=edge_color, width=HIGHLIGHT_WIDTH,
+                arrows=True, arrowstyle='-|>', arrowsize=15
+            )
+
+        # Add title and formatting
+        plt.title(f"{title}\n" + (f"Path {path_num + 1}" if path_num else ""),
+                  fontsize=14, pad=20)
+        plt.axis('off')
+
+        # Save frame with a unique name
+        frame_path = os.path.join(temp_dir, f"frame_{uuid.uuid4().hex}.png")
+        plt.savefig(frame_path, bbox_inches='tight', dpi=100)
+        plt.close()
+        return frame_path
+
+    # Initial frames showing both graphs
+    frames.append(draw_graph(G_real, title="Original Graph"))
+    frames.append(draw_graph(G_pred, title="Predicted Graph"))
+
+    # Progressive path construction
+    for path_num, path in enumerate(all_paths):
+        current_path_edges = []
+        for i in range(len(path) - 1):
+            current_edge = (path[i], path[i + 1])
+            current_path_edges.append(current_edge)
+
+            frame = draw_graph(
+                G_pred,
+                highlighted_edges=current_path_edges,  # Show only the current path
+                title="Building Paths",
+                path_num=path_num
+            )
+            frames.append(frame)
+
+    durations = [100.0, 100.0] + [4.0] * (len(frames) - 3) + [10.0] * len(all_paths)
+
+    # Create the GIF
+    with imageio.get_writer(filename, mode='I', duration=durations) as writer:
+        for frame in frames:
+            try:
+                writer.append_data(imageio.imread(frame))
+            except Exception as e:
+                print(f"Error processing {frame}: {str(e)}")
+
+    # Clean up temporary frames
+    for frame in frames:
+        try:
+            os.remove(frame)
+        except FileNotFoundError:
+            continue
+
+    if os.path.exists(temp_dir):
+        try:
+            os.rmdir(temp_dir)
+        except OSError:
+            shutil.rmtree(temp_dir)
+
+    print(f"GIF successfully created: {filename}")
+    return filename
 
 
 def display_graph(graph: HeteroData, dataset_name: Optional[str] = None, display_legend: bool = True,
