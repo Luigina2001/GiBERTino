@@ -16,7 +16,7 @@ class DialogueGraphDataset(InMemoryDataset):
         self.device = get_device()
         self.dataset_name = dataset_name
         self.relations = RELATIONS[dataset_name]
-        self.num_relations = len(self.relations) + 1
+        self.num_relations = len(self.relations)
         self.negative_sampling_ratio = negative_sampling_ratio
 
         super().__init__(root, transform, pre_transform, pre_filter)

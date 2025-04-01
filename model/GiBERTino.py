@@ -15,10 +15,11 @@ from utils.metrics import Metrics
 class GiBERTino(L.LightningModule):
     def __init__(self, gnn_model: Literal['GCN', 'GAT', 'GraphSAGE'], in_channels: int,
                  hidden_channels: int, num_layers: int,
+                 alpha: float = 0.5,
                  tokenizer: str = 'Alibaba-NLP/gte-modernbert-base',
                  bert_model: str = 'Alibaba-NLP/gte-modernbert-base',
                  lr: float = 1e-3,
-                 relations: int = BALANCED,
+                 relations: str = BALANCED,
                  checkpoint_path: Optional[str] = None):
         super().__init__()
 
@@ -28,6 +29,7 @@ class GiBERTino(L.LightningModule):
 
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         self.bert_model = AutoModel.from_pretrained(bert_model)
+        self.alpha = alpha
 
         # Embedding layer for relations
         NUM_RELATIONS = len(RELATIONS[relations]) + 1
@@ -140,7 +142,7 @@ class GiBERTino(L.LightningModule):
         link_loss = self.link_loss(link_logits, link_labels)
         rel_loss = self.rel_loss(rel_probs, rel_labels)
 
-        loss = link_loss + rel_loss
+        loss = self.alpha * link_loss + (1 - self.alpha) * rel_loss
 
         self.log_dict({f'{stage}/loss': loss,
                        f'{stage}/link_accuracy': link_metrics['link_accuracy'],
