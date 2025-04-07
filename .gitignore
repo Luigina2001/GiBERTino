@@ -4,6 +4,10 @@ pyrightconfig.json
 .conda
 .ipynb_checkpoints
 
+lightning_logs/
+lightning_logs_BOOM/
+eval_results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -30,9 +30,9 @@ VAL_SPLIT_RATIO = 0.1
 METRICS = {
     "link": {
         "accuracy": Accuracy(task='binary'),
-        "precision": Precision(task='binary'),
-        "recall": Recall(task='binary'),
-        "f1": F1Score(task='binary'),
+        "precision": Precision(task='binary', zero_division=0),
+        "recall": Recall(task='binary', zero_division=0),
+        "f1": F1Score(task='binary', zero_division=0),
         "roc": BinaryAUROC(),
     },
     "rel": {

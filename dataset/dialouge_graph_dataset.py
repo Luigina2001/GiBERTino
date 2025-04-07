@@ -4,6 +4,7 @@ from itertools import permutations
 
 import numpy as np
 import torch
+from torch.distributions.constraints import positive
 from torch_geometric.data import InMemoryDataset, HeteroData
 
 from utils import get_device
@@ -16,7 +17,7 @@ class DialogueGraphDataset(InMemoryDataset):
         self.device = get_device()
         self.dataset_name = dataset_name
         self.relations = RELATIONS[dataset_name]
-        self.num_relations = len(self.relations)
+        self.relations.append("Unknown")
         self.negative_sampling_ratio = negative_sampling_ratio
 
         super().__init__(root, transform, pre_transform, pre_filter)
@@ -62,11 +63,12 @@ class DialogueGraphDataset(InMemoryDataset):
 
             # combine positive and negative edges
             edges = np.array(pos_edges + neg_edges)
-            edge_index = torch.tensor(edges, dtype=torch.long).T
+            edge_index = torch.tensor(np.array(edges), dtype=torch.long).T
             # label: 1 for pos, 0 for neg
             link_labels = torch.tensor(np.array([1] * len(pos_edges) + [0] * len(neg_edges)), dtype=torch.long)
             # label: [0-11] for pos, 12 for neg
-            rel_labels = torch.tensor(np.array(rel_labels + [self.num_relations] * len(neg_edges)), dtype=torch.long)
+            rel_labels = torch.tensor(np.array(rel_labels + [self.encode_relation_type("Unknown")] * len(neg_edges)),
+                                      dtype=torch.long)
 
             new_graph = HeteroData()
             new_graph["edu"].x = graph["edu"].x

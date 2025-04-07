@@ -29,7 +29,6 @@ class GiBERTino(L.LightningModule):
 
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         self.bert_model = AutoModel.from_pretrained(bert_model)
-        self.alpha = alpha
 
         # Embedding layer for relations
         NUM_RELATIONS = len(RELATIONS[relations]) + 1
@@ -55,6 +54,7 @@ class GiBERTino(L.LightningModule):
         if checkpoint_path is not None:
             self.load_state_dict(torch.load(checkpoint_path))
 
+        self.alpha = alpha
         self.link_loss = torch.nn.BCEWithLogitsLoss()
         self.rel_loss = torch.nn.CrossEntropyLoss()
 

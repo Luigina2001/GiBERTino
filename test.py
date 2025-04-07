@@ -1,8 +1,8 @@
 import argparse
 import os
-
-import lightning
 import torch
+import json
+
 from tqdm import tqdm
 
 from dataset.dialogue_graph_datamodule import SubDialogueDataModule
@@ -10,6 +10,7 @@ from model.GiBERTino import GiBERTino
 from utils.constants import RELATIONS
 from utils.metrics import Metrics
 from utils.utils import get_device
+import lightning
 
 
 def test_model(args):  # noqa
@@ -37,11 +38,11 @@ def test_model(args):  # noqa
         model.eval()
 
         print("Loading test data...")
-        data_module = SubDialogueDataModule(args.data_path, num_workers=0)
+        data_module = SubDialogueDataModule(args.data_path, dataset_name=args.dataset_name, num_workers=0)
         data_module.setup(stage="test")
         test_loader = data_module.test_dataloader()
 
-        metrics = Metrics(num_classes=len(RELATIONS[args.dataset_name]) + 1, log_dir=args.eval_dir)
+        metrics = Metrics(num_classes=len(RELATIONS[args.dataset_name]), log_dir=args.eval_dir)
         all_metrics = []
 
         print("Running classification...")

@@ -1,11 +1,10 @@
-import torch
-
 from typing import List, Literal
 
+import torch
+from lightning.pytorch.loggers import TensorBoardLogger
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.util import cos_sim
 from torch.utils.tensorboard import SummaryWriter
-from lightning.pytorch.loggers import TensorBoardLogger
 
 from .constants import BATCH_SIZE, METRICS
 from .utils import get_device
@@ -31,9 +30,15 @@ class Metrics:
             setattr(self, f"link_{metric}", METRICS["link"][metric].to(self.device))
 
         for metric in METRICS["rel"]:
-            setattr(self, f"rel_{metric}",
-                    METRICS["rel"][metric](task='multiclass', num_classes=self.num_classes, average='macro').to(
-                        self.device))
+            if metric in ['precision', 'recall', 'f1']:
+                setattr(self, f"rel_{metric}",
+                        METRICS["rel"][metric](task='multiclass', num_classes=self.num_classes, average='macro',
+                                               zero_division=0).to(
+                            self.device))
+            else:
+                setattr(self, f"rel_{metric}",
+                        METRICS["rel"][metric](task='multiclass', num_classes=self.num_classes, average='macro').to(
+                            self.device))
 
         self.sbert_model = SentenceTransformer(sentence_model).to(self.device)
         self.sbert_model.eval()
@@ -46,15 +51,38 @@ class Metrics:
     def compute_metrics(self, preds: torch.Tensor, target: torch.Tensor, metric_type: Literal['link', 'rel'],
                         stage: str, step: int) -> dict:
         metrics = {}
-        for metric in METRICS[metric_type]:
-            metric_value = getattr(self, f"{metric_type}_{metric}")(preds, target).item()
-            metrics[f"{metric_type}_{metric}"] = metric_value
 
-            # Accumulate metrics
-            if metric_type == 'link':
-                self.link_metrics_accumulator[metric] += metric_value
-            else:
-                self.rel_metrics_accumulator[metric] += metric_value
+        for metric_name in METRICS[metric_type]:
+            # Handle metrics sensitive to missing positives
+            if metric_name in ['precision', 'recall', 'f1']:
+                if metric_type == 'binary':
+                    n_positives = target.sum().item()
+                    has_positives = (n_positives > 0)
+                else:  # multiclass
+                    n_positives = (target > 0).sum().item()
+                    has_positives = (n_positives > 0)
+
+                if not has_positives:
+                    print(f"No positives in batch for {metric_type}_{metric_name} "
+                          f"(positives: {n_positives}/{len(target)})")
+                    metrics[f"{metric_type}_{metric_name}"] = 0.0
+                    continue
+
+            # Metric computation
+            try:
+                metric_fn = getattr(self, f"{metric_type}_{metric_name}")
+                metric_value = metric_fn(preds, target).item()
+                metrics[f"{metric_type}_{metric_name}"] = metric_value
+
+                # Update accumulators
+                if metric_type == 'link':
+                    self.link_metrics_accumulator[metric_name] += metric_value
+                else:
+                    self.rel_metrics_accumulator[metric_name] += metric_value
+
+            except Exception as e:
+                print(f"ERROR computing {metric_type}_{metric_name}: {str(e)}")
+                metrics[f"{metric_type}_{metric_name}"] = float('nan')
 
         self.num_batches += 1
         self.log(metrics, stage, step)
