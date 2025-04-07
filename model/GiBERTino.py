@@ -32,7 +32,7 @@ class GiBERTino(L.LightningModule):
 
         # Embedding layer for relations
         NUM_RELATIONS = len(RELATIONS[relations]) + 1
-        self.relation_embeddings = nn.Embedding(NUM_RELATIONS, hidden_channels)
+        self.relation_embeddings = nn.Parameter(torch.randn(NUM_RELATIONS))
 
         # Link prediction classifier
         self.link_classifier = nn.Sequential(

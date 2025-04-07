@@ -91,6 +91,7 @@ class Metrics:
 
     def aggregate_metrics(self):
         # Compute average metrics over all batches
+        self.num_batches = self.num_batches // 2
         aggregated_metrics = {}
         for metric in self.link_metrics_accumulator:
             aggregated_metrics[f"link_{metric}"] = self.link_metrics_accumulator[metric] / self.num_batches

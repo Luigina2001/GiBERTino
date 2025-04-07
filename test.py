@@ -34,7 +34,6 @@ def test_model(args):  # noqa
               f"in_channels={in_channels}, hidden_channels={hidden_channels}, num_layers={num_layers}")
 
         model = GiBERTino.load_from_checkpoint(args.checkpoint_path, map_location=device)
-        model.to(device)
         model.eval()
 
         print("Loading test data...")
@@ -48,8 +47,6 @@ def test_model(args):  # noqa
         print("Running classification...")
         with torch.no_grad():
             for batch in tqdm(test_loader, desc="Processing test data"):
-                batch = {k: v.to(device) for k, v in batch.items()} if isinstance(batch, dict) else batch.to(device)
-
                 link_logits, rel_probs = model(batch)
 
                 link_labels = batch[('edu', 'to', 'edu')].get('link_labels', None)
