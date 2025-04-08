@@ -33,6 +33,10 @@ class GiBERTino(L.LightningModule):
         # Embedding layer for relations
         NUM_RELATIONS = len(RELATIONS[relations]) + 1
         self.relation_embeddings = nn.Parameter(torch.randn(NUM_RELATIONS))
+        # Initialize relation embeddings to promote stable training start while
+        # allowing gradual specialization.
+        # Matches BERT-style initialization practices for embedding layers.
+        nn.init.normal_(self.relation_embeddings, mean=0.0, std=0.02)
 
         # Link prediction classifier
         self.link_classifier = nn.Sequential(
@@ -44,10 +48,9 @@ class GiBERTino(L.LightningModule):
 
         # Relation prediction classifier
         self.rel_classifier = nn.Sequential(
-            # Input size: hidden_channels * 2 (src + dst) + hidden_channels (relation embedding)
-            nn.Linear(hidden_channels * 2 + hidden_channels, hidden_channels),
+            nn.Linear(hidden_channels * 2 + 1, hidden_channels * 2),
             nn.ReLU(),
-            nn.Linear(hidden_channels, NUM_RELATIONS),
+            nn.Linear(hidden_channels * 2, NUM_RELATIONS),
             nn.Softmax(dim=-1)
         )
 
@@ -79,8 +82,8 @@ class GiBERTino(L.LightningModule):
             embeddings = torch.cat([embeddings, cosine_sim], dim=-1)
             return self.link_classifier(embeddings).squeeze(dim=-1)
 
-        rel_emb = self.relation_embeddings(edge_rel)
-        embeddings = torch.cat([embeddings, rel_emb], dim=-1)
+        rel_scalar = self.relation_embeddings[edge_rel].unsqueeze(-1)
+        embeddings = torch.cat([embeddings, rel_scalar], dim=-1)
         return self.rel_classifier(embeddings)
 
     def forward(self, batch):
