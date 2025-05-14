@@ -45,8 +45,8 @@ class Metrics:
 
     def log(self, metrics: dict, stage: str, step: int):
         for key, value in metrics.items():
-            self.logger.experiment.add_scalar(f"{stage}/{key}", value, step)
-            self.writer.add_scalar(f"{stage}/{key}", value, step)
+            self.logger.experiment.add_scalar(f"{stage}_{key}", value, step)
+            self.writer.add_scalar(f"{stage}_{key}", value, step)
 
     def compute_metrics(self, preds: torch.Tensor, target: torch.Tensor, metric_type: Literal['link', 'rel'],
                         stage: str, step: int) -> dict:
@@ -110,6 +110,6 @@ class Metrics:
 
         # compute cosine similarity
         similarity = cos_sim(pred_embeddings, target_embeddings).diag().mean().item()
-        self.log({f"{stage}/sbert_similarity": similarity}, stage, step)
+        self.log({f"{stage}_sbert_similarity": similarity}, stage, step)
 
         return similarity
