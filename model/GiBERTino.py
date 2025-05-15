@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch_geometric
 from transformers import AutoModel, AutoTokenizer
+
 from utils import print_metrics
 from utils.constants import BALANCED, RELATIONS
 from utils.metrics import Metrics
@@ -76,13 +77,12 @@ class FocalLoss(nn.Module):
 
     def binary_focal_loss(self, inputs, targets):
         """Focal loss for binary classification."""
+        inputs = inputs.float()
         probs = torch.sigmoid(inputs)
         targets = targets.float()
 
         # Compute binary cross entropy
-        bce_loss = F.binary_cross_entropy_with_logits(
-            inputs.argmax(dim=1), targets, reduction="none"
-        )
+        bce_loss = F.binary_cross_entropy_with_logits(inputs.argmax(dim=1), targets)
 
         # Compute focal weight
         p_t = probs * targets + (1 - probs) * (1 - targets)
@@ -108,6 +108,7 @@ class FocalLoss(nn.Module):
             alpha = self.alpha.to(inputs.device)
 
         # Convert logits to probabilities with softmax
+        inputs = inputs.float()
         probs = F.softmax(inputs, dim=1)
 
         # One-hot encode the targets
@@ -307,7 +308,7 @@ class GiBERTino(L.LightningModule):
             self.global_step,
         )
 
-        link_loss = self.link_loss(link_logits, link_labels)
+        link_loss = self.link_loss(link_logits.float(), link_labels)
         rel_loss = self.rel_loss(rel_probs, rel_labels)
 
         loss = self.alpha * link_loss + (1 - self.alpha) * rel_loss
