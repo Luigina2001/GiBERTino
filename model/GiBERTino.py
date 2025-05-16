@@ -215,7 +215,7 @@ class GiBERTino(L.LightningModule):
 
         self.alpha = alpha
         self.link_loss = torch.nn.BCEWithLogitsLoss()
-        self.rel_loss = FocalLoss()
+        self.rel_loss = FocalLoss(task_type="multi-class", num_classes=NUM_RELATIONS)
 
         self.metrics = Metrics(NUM_RELATIONS)
 
