@@ -8,160 +8,10 @@ import torch_geometric
 from transformers import AutoModel, AutoTokenizer
 
 from utils import print_metrics
-from utils.constants import BALANCED, RELATIONS
+from utils.constants import RELATIONS
 from utils.metrics import Metrics
 
-
-# https://github.com/itakurah/Focal-loss-PyTorch
-class FocalLoss(nn.Module):
-    def __init__(
-        self,
-        gamma=2,
-        alpha=None,
-        reduction="mean",
-        task_type="binary",
-        num_classes=None,
-    ):
-        """
-        Unified Focal Loss class for binary, multi-class, and multi-label classification tasks.
-        :param gamma: Focusing parameter, controls the strength of the modulating factor (1 - p_t)^gamma
-        :param alpha: Balancing factor, can be a scalar or a tensor for class-wise weights. If None, no class balancing is used.
-        :param reduction: Specifies the reduction method: 'none' | 'mean' | 'sum'
-        :param task_type: Specifies the type of task: 'binary', 'multi-class', or 'multi-label'
-        :param num_classes: Number of classes (only required for multi-class classification)
-        """
-        super(FocalLoss, self).__init__()
-        self.gamma = gamma
-        self.alpha = alpha
-        self.reduction = reduction
-        self.task_type = task_type
-        self.num_classes = num_classes
-
-        # Handle alpha for class balancing in multi-class tasks
-        if (
-            task_type == "multi-class"
-            and alpha is not None
-            and isinstance(alpha, (list, torch.Tensor))
-        ):
-            assert (
-                num_classes is not None
-            ), "num_classes must be specified for multi-class classification"
-            if isinstance(alpha, list):
-                self.alpha = torch.Tensor(alpha)
-            else:
-                self.alpha = alpha
-
-    def forward(self, inputs, targets):
-        """
-        Forward pass to compute the Focal Loss based on the specified task type.
-        :param inputs: Predictions (logits) from the model.
-                       Shape:
-                         - binary/multi-label: (batch_size, num_classes)
-                         - multi-class: (batch_size, num_classes)
-        :param targets: Ground truth labels.
-                        Shape:
-                         - binary: (batch_size,)
-                         - multi-label: (batch_size, num_classes)
-                         - multi-class: (batch_size,)
-        """
-        if self.task_type == "binary":
-            return self.binary_focal_loss(inputs, targets)
-        elif self.task_type == "multi-class":
-            return self.multi_class_focal_loss(inputs, targets)
-        elif self.task_type == "multi-label":
-            return self.multi_label_focal_loss(inputs, targets)
-        else:
-            raise ValueError(
-                f"Unsupported task_type '{self.task_type}'. Use 'binary', 'multi-class', or 'multi-label'."
-            )
-
-    def binary_focal_loss(self, inputs, targets):
-        """Focal loss for binary classification."""
-        inputs = inputs.float()
-        probs = torch.sigmoid(inputs)
-        targets = targets.float()
-
-        # Compute binary cross entropy
-        bce_loss = F.binary_cross_entropy_with_logits(inputs.argmax(dim=1), targets)
-
-        # Compute focal weight
-        p_t = probs * targets + (1 - probs) * (1 - targets)
-        focal_weight = (1 - p_t) ** self.gamma
-
-        # Apply alpha if provided
-        if self.alpha is not None:
-            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
-            bce_loss = alpha_t * bce_loss
-
-        # Apply focal loss weighting
-        loss = focal_weight * bce_loss
-
-        if self.reduction == "mean":
-            return loss.mean()
-        elif self.reduction == "sum":
-            return loss.sum()
-        return loss
-
-    def multi_class_focal_loss(self, inputs, targets, use_softmax: bool = False):
-        """Focal loss for multi-class classification."""
-        if self.alpha is not None:
-            alpha = self.alpha.to(inputs.device)
-
-        # Convert logits to probabilities with softmax
-        inputs = inputs.float()
-        if use_softmax:
-            probs = F.softmax(inputs, dim=-1)
-        else:
-            probs = inputs
-
-        # One-hot encode the targets
-        targets_one_hot = F.one_hot(targets, num_classes=self.num_classes).float()
-
-        # Compute cross-entropy for each class
-        ce_loss = -targets_one_hot * torch.log(probs)
-
-        # Compute focal weight
-        p_t = torch.sum(probs * targets_one_hot, dim=-1)  # p_t for each sample
-        focal_weight = (1 - p_t) ** self.gamma
-
-        # Apply alpha if provided (per-class weighting)
-        if self.alpha is not None:
-            alpha_t = alpha.gather(0, targets)
-            ce_loss = alpha_t.unsqueeze(1) * ce_loss
-
-        # Apply focal loss weight
-        loss = focal_weight.unsqueeze(1) * ce_loss
-
-        if self.reduction == "mean":
-            return loss.mean()
-        elif self.reduction == "sum":
-            return loss.sum()
-        return loss
-
-    def multi_label_focal_loss(self, inputs, targets):
-        """Focal loss for multi-label classification."""
-        probs = torch.sigmoid(inputs)
-
-        # Compute binary cross entropy
-        bce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
-
-        # Compute focal weight
-        p_t = probs * targets + (1 - probs) * (1 - targets)
-        focal_weight = (1 - p_t) ** self.gamma
-
-        # Apply alpha if provided
-        if self.alpha is not None:
-            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
-            bce_loss = alpha_t * bce_loss
-
-        # Apply focal loss weight
-        loss = focal_weight * bce_loss
-
-        if self.reduction == "mean":
-            return loss.mean()
-        elif self.reduction == "sum":
-            return loss.sum()
-        return loss
+REL_EMBEDDING_DIM = 32
 
 
 class GiBERTino(L.LightningModule):
@@ -190,11 +40,11 @@ class GiBERTino(L.LightningModule):
 
         # Embedding layer for relations
         NUM_RELATIONS = len(RELATIONS["UNIFIED"]) + 1
-        self.relation_embeddings = nn.Parameter(torch.randn(NUM_RELATIONS))
+        self.relation_embeddings = nn.Embedding(NUM_RELATIONS, REL_EMBEDDING_DIM)
         # Initialize relation embeddings to promote stable training start while
         # allowing gradual specialization.
         # Matches BERT-style initialization practices for embedding layers.
-        nn.init.normal_(self.relation_embeddings, mean=0.0, std=0.02)
+        nn.init.normal_(self.relation_embeddings.weight, mean=0.0, std=0.02)
 
         # Link prediction classifier
         self.link_classifier = nn.Sequential(
@@ -206,10 +56,9 @@ class GiBERTino(L.LightningModule):
 
         # Relation prediction classifier
         self.rel_classifier = nn.Sequential(
-            nn.Linear(hidden_channels * 2 + 1, hidden_channels * 2),
+            nn.Linear(hidden_channels * 2 + REL_EMBEDDING_DIM, hidden_channels),
             nn.ReLU(),
-            nn.Linear(hidden_channels * 2, NUM_RELATIONS),
-            nn.Softmax(dim=-1),
+            nn.Linear(hidden_channels, NUM_RELATIONS)
         )
 
         if checkpoint_path is not None:
@@ -217,7 +66,7 @@ class GiBERTino(L.LightningModule):
 
         self.alpha = alpha
         self.link_loss = torch.nn.BCEWithLogitsLoss()
-        self.rel_loss = FocalLoss(task_type="multi-class", num_classes=NUM_RELATIONS)
+        self.rel_loss = torch.nn.CrossEntropyLoss()
 
         self.metrics = Metrics(NUM_RELATIONS)
 
@@ -239,8 +88,8 @@ class GiBERTino(L.LightningModule):
             embeddings = torch.cat([embeddings, cosine_sim], dim=-1)
             return self.link_classifier(embeddings).squeeze(dim=-1)
 
-        rel_scalar = self.relation_embeddings[edge_rel].unsqueeze(-1)
-        embeddings = torch.cat([embeddings, rel_scalar], dim=-1)
+        rel_vec = self.relation_embeddings(edge_rel)
+        embeddings = torch.cat([embeddings, rel_vec], dim=-1)
         return self.rel_classifier(embeddings)
 
     def forward(self, batch):
@@ -256,20 +105,18 @@ class GiBERTino(L.LightningModule):
         # token-level embeddings correspond to local embeddings, in order to
         # get global-level embeddings we need to perform a sort of pooling
         # operation
-        flat_local_embeddings = outputs.last_hidden_state
-
-        flat_local_embeddings = flat_local_embeddings.mean(dim=-1)
+        flat_local_embeddings = outputs.last_hidden_state.mean(dim=1)
         x, edge_index = batch["edu"].x, batch["edu", "to", "edu"].edge_index
         x = torch.cat((x, flat_local_embeddings), dim=-1)
         embeddings = self.gnn_model(x, edge_index)
 
         link_logits = self._predict(embeddings, edge_index, edge_rel, "link")
-        rel_probs = self._predict(embeddings, edge_index, edge_rel, "rel")
+        rel_logits = self._predict(embeddings, edge_index, edge_rel, "rel")
 
-        return link_logits, rel_probs
+        return link_logits, rel_logits
 
     def compute_loss(self, batch, stage):
-        link_logits, rel_probs = self.forward(batch)
+        link_logits, rel_logits = self.forward(batch)
         link_labels = batch["edu", "to", "edu"].link_labels.float()
         rel_labels = batch["edu", "to", "edu"].rel_labels
 
@@ -277,7 +124,7 @@ class GiBERTino(L.LightningModule):
             link_logits, link_labels, "link", stage, self.global_step
         )
         rel_metrics = self.metrics.compute_metrics(
-            rel_probs, rel_labels, "rel", stage, self.global_step
+            rel_logits, rel_labels, "rel", stage, self.global_step
         )
 
         self.metrics.log(
@@ -290,7 +137,7 @@ class GiBERTino(L.LightningModule):
         )
 
         link_loss = self.link_loss(link_logits.float(), link_labels)
-        rel_loss = self.rel_loss(rel_probs, rel_labels)
+        rel_loss = self.rel_loss(rel_logits, rel_labels)
 
         loss = self.alpha * link_loss + (1 - self.alpha) * rel_loss
 

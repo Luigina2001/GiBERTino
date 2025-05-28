@@ -48,7 +48,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 0
 model:
   gnn_model: GCN
-  in_channels: 41
+  in_channels: 770
   hidden_channels: 64
   num_layers: 32
   alpha: 0.5
