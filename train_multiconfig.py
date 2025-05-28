@@ -25,7 +25,7 @@ def run_experiment(dataset: str, graph_type: str, params: Dict):
     )
 
     model = GiBERTino(
-        in_channels=41,
+        in_channels=770,
         gnn_model=params["gnn_model"],
         hidden_channels=params["hidden_channels"],
         num_layers=params["num_layers"],
@@ -37,6 +37,7 @@ def run_experiment(dataset: str, graph_type: str, params: Dict):
         save_dir="lightning_logs",
         project="giBERTino",
         log_model=False,
+        reinit=True,
     )
 
     # Initialize callbacks
@@ -52,7 +53,7 @@ def run_experiment(dataset: str, graph_type: str, params: Dict):
     )
 
     checkpoint_callback = ModelCheckpoint(
-        filename=f"{experiment_name}-epoch-{{epoch:02d}}-val_loss={{val_loss:.2f}}",
+        filename=f"{experiment_name}-{{epoch:02d}}-{{val_loss:.2f}}",
         monitor="val_loss",
         save_top_k=1,
         save_weights_only=False,

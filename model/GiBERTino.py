@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 import lightning as L
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 import torch_geometric
 from transformers import AutoModel, AutoTokenizer
@@ -11,7 +11,7 @@ from utils import print_metrics
 from utils.constants import RELATIONS
 from utils.metrics import Metrics
 
-REL_EMBEDDING_DIM = 32
+REL_EMBEDDING_DIM = 64
 
 
 class GiBERTino(L.LightningModule):
@@ -56,9 +56,9 @@ class GiBERTino(L.LightningModule):
 
         # Relation prediction classifier
         self.rel_classifier = nn.Sequential(
-            nn.Linear(hidden_channels * 2 + REL_EMBEDDING_DIM, hidden_channels),
+            nn.Linear(REL_EMBEDDING_DIM, REL_EMBEDDING_DIM // 2),
             nn.ReLU(),
-            nn.Linear(hidden_channels, NUM_RELATIONS)
+            nn.Linear(REL_EMBEDDING_DIM // 2, NUM_RELATIONS)
         )
 
         if checkpoint_path is not None:
@@ -89,8 +89,7 @@ class GiBERTino(L.LightningModule):
             return self.link_classifier(embeddings).squeeze(dim=-1)
 
         rel_vec = self.relation_embeddings(edge_rel)
-        embeddings = torch.cat([embeddings, rel_vec], dim=-1)
-        return self.rel_classifier(embeddings)
+        return self.rel_classifier(rel_vec)
 
     def forward(self, batch):
         # tokenize raw edus

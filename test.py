@@ -1,8 +1,8 @@
 import argparse
 import os
-import torch
-import json
 
+import lightning
+import torch
 from tqdm import tqdm
 
 from dataset.dialogue_graph_datamodule import SubDialogueDataModule
@@ -10,7 +10,6 @@ from model.GiBERTino import GiBERTino
 from utils.constants import RELATIONS
 from utils.metrics import Metrics
 from utils.utils import get_device
-import lightning
 
 
 def test_model(args):  # noqa
@@ -26,7 +25,7 @@ def test_model(args):  # noqa
         checkpoint = torch.load(args.checkpoint_path, map_location=device, weights_only=False)
         # Extract model parameters from the checkpoint
         model_config = checkpoint.get("hyper_parameters", {})
-        in_channels = model_config.get("in_channels", 2304)
+        in_channels = model_config.get("in_channels", 770)
         hidden_channels = model_config.get("hidden_channels", 10)
         num_layers = model_config.get("num_layers", 3)
 
@@ -37,11 +36,11 @@ def test_model(args):  # noqa
         model.eval()
 
         print("Loading test data...")
-        data_module = SubDialogueDataModule(args.data_path, dataset_name=args.dataset_name, num_workers=0)
+        data_module = SubDialogueDataModule(args.data_path, num_workers=0)
         data_module.setup(stage="test")
         test_loader = data_module.test_dataloader()
 
-        metrics = Metrics(num_classes=len(RELATIONS[args.dataset_name]), log_dir=args.eval_dir)
+        metrics = Metrics(num_classes=len(RELATIONS['UNIFIED']), log_dir=args.eval_dir)
         all_metrics = []
 
         print("Running classification...")
