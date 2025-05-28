@@ -30,15 +30,9 @@ class Metrics:
             setattr(self, f"link_{metric}", METRICS["link"][metric].to(self.device))
 
         for metric in METRICS["rel"]:
-            if metric in ['precision', 'recall', 'f1']:
-                setattr(self, f"rel_{metric}",
-                        METRICS["rel"][metric](task='multiclass', num_classes=self.num_classes, average='macro',
-                                               zero_division=0).to(
-                            self.device))
-            else:
-                setattr(self, f"rel_{metric}",
-                        METRICS["rel"][metric](task='multiclass', num_classes=self.num_classes, average='macro').to(
-                            self.device))
+            setattr(self, f"rel_{metric}",
+                    METRICS["rel"][metric](task='multiclass', num_classes=self.num_classes, average='macro').to(
+                        self.device))
 
         self.sbert_model = SentenceTransformer(sentence_model).to(self.device)
         self.sbert_model.eval()
@@ -53,20 +47,18 @@ class Metrics:
         metrics = {}
 
         for metric_name in METRICS[metric_type]:
-            # Handle metrics sensitive to missing positives
-            if metric_name in ['precision', 'recall', 'f1']:
-                if metric_type == 'binary':
-                    n_positives = target.sum().item()
-                    has_positives = (n_positives > 0)
-                else:  # multiclass
-                    n_positives = (target > 0).sum().item()
-                    has_positives = (n_positives > 0)
+            if metric_type == 'link':
+                n_positives = target.sum().item()
+                has_positives = (n_positives > 0)
+            else:  # multiclass
+                n_positives = (target > 0).sum().item()
+                has_positives = (n_positives > 0)
 
-                if not has_positives:
-                    print(f"No positives in batch for {metric_type}_{metric_name} "
-                          f"(positives: {n_positives}/{len(target)})")
-                    metrics[f"{metric_type}_{metric_name}"] = 0.0
-                    continue
+            if not has_positives:
+                print(f"No positives in batch for {metric_type}_{metric_name} "
+                      f"(positives: {n_positives}/{len(target)})")
+                metrics[f"{metric_type}_{metric_name}"] = 0.0
+                continue
 
             # Metric computation
             try:

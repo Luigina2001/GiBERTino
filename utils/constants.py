@@ -1,12 +1,11 @@
 import os.path as osp
-
 from torchmetrics.classification import Accuracy, Precision, Recall, F1Score, BinaryAUROC, AUROC
 
 DATA_DIR = "data"
-MOLWENI = 'MOLWENI'
-STAC = 'STAC'
-MINECRAFT = 'MINECRAFT'
-BALANCED = 'BALANCED'
+MOLWENI = "MOLWENI"
+STAC = "STAC"
+MINECRAFT = "MINECRAFT"
+BALANCED = "BALANCED"
 
 MAX_SENTENCE_LEN = 39
 
@@ -17,9 +16,9 @@ DATASETS = {
 }
 
 SENTIMENTS = {
-    'NEU': 0,
-    'POS': 1,
-    'NEG': -1
+    "NEU": 0,
+    "POS": 1,
+    "NEG": -1
 }
 
 NEGATIVE_SAMPLES_RATIO = 50
@@ -29,11 +28,11 @@ VAL_SPLIT_RATIO = 0.1
 
 METRICS = {
     "link": {
-        "accuracy": Accuracy(task='binary'),
-        "precision": Precision(task='binary', zero_division=0),
-        "recall": Recall(task='binary', zero_division=0),
-        "f1": F1Score(task='binary', zero_division=0),
-        "roc": BinaryAUROC(),
+        "accuracy": Accuracy(task="binary"),
+        "precision": Precision(task="binary"),
+        "recall": Recall(task="binary"),
+        "f1": F1Score(task="binary"),
+        "roc": AUROC(task="binary"),
     },
     "rel": {
         "accuracy": Accuracy,
@@ -46,60 +45,98 @@ METRICS = {
 
 RELATIONS = {
     "BALANCED": [
-        'Clarification_question', 'Explanation', 'Contrast', 'Comment',
-        'Elaboration', 'Result', 'QAP', 'Correction', 'Narration',
-        'Acknowledgement', 'Q-Elab', 'Continuation'
-    ],
-    "MINECRAFT": ["Acknowledgement",
-                  "Continuation",
-                  "Elaboration",
-                  "Comment",
-                  "Result",
-                  "Confirmation_question",
-                  "QAP",
-                  "Clarification_question",
-                  "Contrast",
-                  "Correction",
-                  "Narration",
-                  "Alternation",
-                  "Sequence",
-                  "Q-Elab",
-                  "Conditional",
-                  "Explanation"],
-    "MOLWENI": ["QAP",
-                "Comment",
-                "Clarification_question",
-                "Continuation",
-                "Acknowledgement",
-                "Conditional",
-                "Contrast",
-                "Explanation",
-                "Elaboration",
-                "Result",
-                "Correction",
-                "Q-Elab",
-                "Parallel",
-                "Background",
-                "Alternation",
-                "Narration"],
-    "STAC": [
+        "Clarification_question",
+        "Explanation",
+        "Contrast",
         "Comment",
         "Elaboration",
-        "QAP",
-        "Q-Elab",
-        "Explanation",
         "Result",
-        "Continuation",
-        "Acknowledgement",
-        "Contrast",
-        "Conditional",
+        "QAP",
         "Correction",
-        "Background",
-        "Parallel",
-        "Alternation",
-        "Clarification_question",
         "Narration",
+        "Acknowledgement",
+        "Q-Elab",
+        "Continuation"
+    ],
+
+    "MINECRAFT": [
+        "Clarification_question",
+        "Explanation",
+        "Contrast",
+        "Comment",
+        "Elaboration",
+        "Result",
+        "QAP",
+        "Correction",
+        "Narration",
+        "Acknowledgement",
+        "Q-Elab",
+        "Continuation",
+        "Alternation",
+        "Conditional",
+        "Sequence",
+        "Confirmation_question"
+    ],
+
+    "MOLWENI": [
+        "Clarification_question",
+        "Explanation",
+        "Contrast",
+        "Comment",
+        "Elaboration",
+        "Result",
+        "QAP",
+        "Correction",
+        "Narration",
+        "Acknowledgement",
+        "Q-Elab",
+        "Continuation",
+        "Alternation",
+        "Conditional",
+        "Background",
+        "Parallel"
+    ],
+
+    "STAC": [
+        "Clarification_question",
+        "Explanation",
+        "Contrast",
+        "Comment",
+        "Elaboration",
+        "Result",
+        "QAP",
+        "Correction",
+        "Narration",
+        "Acknowledgement",
+        "Q-Elab",
+        "Continuation",
+        "Alternation",
+        "Conditional",
+        "Background",
+        "Parallel"
+    ],
+
+    "UNIFIED": [
+        "Clarification_question",
+        "Explanation",
+        "Contrast",
+        "Comment",
+        "Elaboration",
+        "Result",
+        "QAP",
+        "Correction",
+        "Narration",
+        "Acknowledgement",
+        "Q-Elab",
+        "Continuation",
+        "Alternation",
+        "Conditional",
+        "Sequence",
+        "Confirmation_question",
+        "Background",
+        "Parallel"
     ]
+
 }
 
 RELATIONS_COLOR_MAPS = {

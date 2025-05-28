@@ -18,22 +18,18 @@ def run_experiment(dataset: str, graph_type: str, params: Dict):
     print(f"\n{'#' * 50}")
     print(f"Starting {experiment_name}")
 
-    # Initialize data module (replace with your real one)
     data_module = SubDialogueDataModule(
         root=data_root,
-        dataset_name=dataset,
         batch_size=params["batch_size"],
-        num_workers=0,  # Important on macOS!
+        num_workers=0,
     )
 
-    # Initialize model (replace with your real one)
     model = GiBERTino(
         in_channels=41,
         gnn_model=params["gnn_model"],
         hidden_channels=params["hidden_channels"],
         num_layers=params["num_layers"],
         lr=params["lr"],
-        relations=dataset,
     )
 
     logger = WandbLogger(

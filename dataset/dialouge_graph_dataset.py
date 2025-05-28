@@ -14,15 +14,13 @@ class DialogueGraphDataset(InMemoryDataset):
     def __init__(
         self,
         root: str,
-        dataset_name: str,
         negative_sampling_ratio: float = NEGATIVE_SAMPLES_RATIO,
         transform=None,
         pre_transform=None,
         pre_filter=None,
     ):
         self.device = get_device()
-        self.dataset_name = dataset_name
-        self.relations = RELATIONS[dataset_name]
+        self.relations = RELATIONS["UNIFIED"]
         self.relations.append("Unknown")
         self.negative_sampling_ratio = negative_sampling_ratio
 

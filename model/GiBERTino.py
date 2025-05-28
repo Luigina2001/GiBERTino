@@ -102,14 +102,17 @@ class FocalLoss(nn.Module):
             return loss.sum()
         return loss
 
-    def multi_class_focal_loss(self, inputs, targets):
+    def multi_class_focal_loss(self, inputs, targets, use_softmax: bool = False):
         """Focal loss for multi-class classification."""
         if self.alpha is not None:
             alpha = self.alpha.to(inputs.device)
 
         # Convert logits to probabilities with softmax
         inputs = inputs.float()
-        probs = F.softmax(inputs, dim=1)
+        if use_softmax:
+            probs = F.softmax(inputs, dim=-1)
+        else:
+            probs = inputs
 
         # One-hot encode the targets
         targets_one_hot = F.one_hot(targets, num_classes=self.num_classes).float()
@@ -118,7 +121,7 @@ class FocalLoss(nn.Module):
         ce_loss = -targets_one_hot * torch.log(probs)
 
         # Compute focal weight
-        p_t = torch.sum(probs * targets_one_hot, dim=1)  # p_t for each sample
+        p_t = torch.sum(probs * targets_one_hot, dim=-1)  # p_t for each sample
         focal_weight = (1 - p_t) ** self.gamma
 
         # Apply alpha if provided (per-class weighting)
@@ -172,7 +175,6 @@ class GiBERTino(L.LightningModule):
         tokenizer: str = "Alibaba-NLP/gte-modernbert-base",
         bert_model: str = "Alibaba-NLP/gte-modernbert-base",
         lr: float = 1e-3,
-        relations: str = BALANCED,
         checkpoint_path: Optional[str] = None,
     ):
         super().__init__()
@@ -187,7 +189,7 @@ class GiBERTino(L.LightningModule):
         self.bert_model = AutoModel.from_pretrained(bert_model)
 
         # Embedding layer for relations
-        NUM_RELATIONS = len(RELATIONS[relations]) + 1
+        NUM_RELATIONS = len(RELATIONS["UNIFIED"]) + 1
         self.relation_embeddings = nn.Parameter(torch.randn(NUM_RELATIONS))
         # Initialize relation embeddings to promote stable training start while
         # allowing gradual specialization.
@@ -231,8 +233,6 @@ class GiBERTino(L.LightningModule):
         embeddings = torch.cat([node_embeddings[src], node_embeddings[dst]], dim=-1)
 
         if predict == "link":
-            # src_emb = F.normalize(node_embeddings[src], dim=-1)
-            # dst_emb = F.normalize(node_embeddings[dst], dim=-1)
             cosine_sim = F.cosine_similarity(
                 node_embeddings[src], node_embeddings[dst], dim=-1, eps=1e-8
             ).unsqueeze(-1)
@@ -248,8 +248,6 @@ class GiBERTino(L.LightningModule):
         # AutoTokenizer expects a flat list of texts but the dataloader returns
         # a list of lists of texts
         # keep track of which edus correspond to which graph
-        # edu_indices = [len(edus) for edus in batch["edu"].edus]
-        # flat_edus = [edu for edus in batch["edu"].edus for edu in edus]
         edge_rel = batch["edu", "to", "edu"].rel_labels
 
         outputs = self.bert_model(**batch["edu"].edus)
@@ -260,23 +258,6 @@ class GiBERTino(L.LightningModule):
         # operation
         flat_local_embeddings = outputs.last_hidden_state
 
-        # get local embeddings per graph, returned as a tuple
-        # local_embeddings = torch.split(flat_local_embeddings, edu_indices)
-        # local_attention_masks = torch.split(tokenized_edus["attention_mask"], edu_indices)
-
-        # node_embeddings = []
-
-        # for i in range(batch.batch_size):
-        #     # the attention mask indices indicate which tokens are actual words (1)
-        #     # and which are padding tokens (0)
-        #     input_mask_expanded = local_attention_masks[i].unsqueeze(-1).expand(local_embeddings[i].shape).float()
-        #     valid_local_tokens = local_embeddings[i] * input_mask_expanded
-        #
-        #     cumulative_attention = input_mask_expanded.cumsum(dim=1)
-        #     contextualized_global_embeddings = torch.cumsum(valid_local_tokens, dim=1) / cumulative_attention
-        #     node_embeddings.append(torch.cat((local_embeddings[i], contextualized_global_embeddings), dim=1))
-
-        # node_embeddings = torch.cat(node_embeddings, dim=0)
         flat_local_embeddings = flat_local_embeddings.mean(dim=-1)
         x, edge_index = batch["edu"].x, batch["edu", "to", "edu"].edge_index
         x = torch.cat((x, flat_local_embeddings), dim=-1)

@@ -10,12 +10,11 @@ from .dialouge_graph_dataset import DialogueGraphDataset
 
 
 class SubDialogueDataModule(LightningDataModule):
-    def __init__(self, root: str, dataset_name: str, batch_size: int = BATCH_SIZE, num_workers: int = NUM_WORKERS,
+    def __init__(self, root: str, batch_size: int = BATCH_SIZE, num_workers: int = NUM_WORKERS,
                  negative_sampling_ratio: float = NEGATIVE_SAMPLES_RATIO,
                  val_split_ratio: float = VAL_SPLIT_RATIO):
         super().__init__()
         self.root = root
-        self.dataset_name = dataset_name
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.negative_sampling_ratio = negative_sampling_ratio
@@ -47,13 +46,11 @@ class SubDialogueDataModule(LightningDataModule):
         if stage == "fit":
             self.move_val_samples()
             self.train_data = DialogueGraphDataset(root=os.path.join(self.root, 'train'),
-                                                   dataset_name=self.dataset_name,
                                                    negative_sampling_ratio=self.negative_sampling_ratio)
-            self.val_data = DialogueGraphDataset(root=os.path.join(self.root, 'val'), dataset_name=self.dataset_name,
+            self.val_data = DialogueGraphDataset(root=os.path.join(self.root, 'val'),
                                                  negative_sampling_ratio=self.negative_sampling_ratio)
         if stage == "test":
-            self.test_data = DialogueGraphDataset(root=os.path.join(self.root, 'test'),
-                                                  dataset_name=self.dataset_name, )
+            self.test_data = DialogueGraphDataset(root=os.path.join(self.root, 'test'))
 
     def train_dataloader(self):
         return DataLoader(self.train_data, batch_size=self.batch_size, num_workers=self.num_workers,
