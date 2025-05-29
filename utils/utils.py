@@ -1,24 +1,24 @@
 import json
-import random
 import logging
 import os
-import imageio.v2 as imageio
-from typing import Optional, List
+import random
 import shutil
 import uuid
+from typing import Optional, List
 
+import imageio.v2 as imageio
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import networkx as nx
 import torch.backends.mps
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
-from torch_geometric.data import HeteroData
-from torch_geometric.utils.convert import to_networkx
 from rich.console import Console
 from rich.table import Table
+from torch_geometric.data import HeteroData
+from torch_geometric.utils.convert import to_networkx
 
-from utils.constants import RELATIONS_COLOR_MAPS, RELATIONS
+from utils.constants import RELATIONS_COLOR_MAPS
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
