@@ -44,6 +44,77 @@ METRICS = {
     }
 }
 
+RELATIONS_COUNTS = {
+    "STAC": {
+        "Clarification_question": 386,
+        "Explanation": 444,
+        "Contrast": 450,
+        "Comment": 1725,
+        "Elaboration": 873,
+        "Result": 360,
+        "QAP": 2437,
+        "Correction": 194,
+        "Narration": 85,
+        "Acknowledgement": 1254,
+        "Q-Elab": 518,
+        "Continuation": 975,
+        "Alternation": 100,
+        "Conditional": 117,
+        "Background": 88,
+        "Parallel": 176
+    },
+    "MINECRAFT": {
+        "Clarification_question": 569,
+        "Explanation": 31,
+        "Contrast": 225,
+        "Comment": 1027,
+        "Elaboration": 2259,
+        "Result": 5928,
+        "QAP": 1119,
+        "Correction": 1229,
+        "Narration": 2577,
+        "Acknowledgement": 2528,
+        "Q-Elab": 135,
+        "Continuation": 1250,
+        "Alternation": 109,
+        "Conditional": 56,
+        "Sequence": 19,
+        "Confirmation_question": 560
+    },
+    "MOLWENI": {
+        "Clarification_question": 16949,
+        "Explanation": 1061,
+        "Contrast": 880,
+        "Comment": 22511,
+        "Elaboration": 1624,
+        "Result": 1747,
+        "QAP": 14172,
+        "Correction": 916,
+        "Narration": 204,
+        "Acknowledgement": 2281,
+        "Q-Elab": 2122,
+        "Continuation": 4680,
+        "Alternation": 178,
+        "Conditional": 703,
+        "Background": 260,
+        "Parallel": 166
+    },
+    "BALANCED": {
+        "Clarification_question": 15589,
+        "Explanation": 1246,
+        "Contrast":1154,
+        "Comment": 21794,
+        "Elaboration": 2488,
+        "Result": 3123,
+        "QAP": 15612,
+        "Correction": 1158,
+        "Narration": 788,
+        "Acknowledgement": 3512,
+        "Q-Elab": 2455,
+        "Continuation": 4998
+    }
+}
+
 RELATIONS = {
     "BALANCED": [
         "Clarification_question",

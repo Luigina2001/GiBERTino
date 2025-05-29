@@ -26,6 +26,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def log_inverse_freq_weights(class_counts):
+    import numpy as np
+
+    total = sum(class_counts)
+    weights = [np.log(1 + total / c) if c != 0 else c for c in class_counts]
+    weights = weights / np.sum(weights) * len(class_counts)
+    return weights
+
+
 def load_dataset(file_path: str):
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)

@@ -56,8 +56,9 @@ model:
   bert_model: Alibaba-NLP/gte-modernbert-base
   lr: 1.0e-05
   checkpoint_path: null
+  dataset_name: STAC
 data:
-  root: data/MOLWENI/alibaba-graphs
+  root: data/STAC/alibaba-graphs
   batch_size: 32
   num_workers: 0
   negative_sampling_ratio: 50.0

@@ -7,8 +7,8 @@ import torch.nn.functional as F
 import torch_geometric
 from transformers import AutoModel, AutoTokenizer
 
-from utils import print_metrics
-from utils.constants import RELATIONS
+from utils import print_metrics, log_inverse_freq_weights
+from utils.constants import RELATIONS, RELATIONS_COUNTS
 from utils.metrics import Metrics
 
 REL_EMBEDDING_DIM = 64
@@ -21,6 +21,7 @@ class GiBERTino(L.LightningModule):
         in_channels: int,
         hidden_channels: int,
         num_layers: int,
+        dataset_name: Literal["STAC", "MOLWENI", "MINECRAFT", "BALANCED"],
         alpha: float = 0.5,
         tokenizer: str = "Alibaba-NLP/gte-modernbert-base",
         bert_model: str = "Alibaba-NLP/gte-modernbert-base",
@@ -64,9 +65,14 @@ class GiBERTino(L.LightningModule):
         if checkpoint_path is not None:
             self.load_state_dict(torch.load(checkpoint_path))
 
+        class_counts = [0] * NUM_RELATIONS
+        for rel, count in RELATIONS_COUNTS[dataset_name].items():
+            class_counts[RELATIONS["UNIFIED"].index(rel)] = count
+
+        self.class_weights = torch.tensor(log_inverse_freq_weights(class_counts), dtype=torch.float32)
         self.alpha = alpha
         self.link_loss = torch.nn.BCEWithLogitsLoss()
-        self.rel_loss = torch.nn.CrossEntropyLoss()
+        self.rel_loss = torch.nn.CrossEntropyLoss(weight=self.class_weights)
 
         self.metrics = Metrics(NUM_RELATIONS)
 

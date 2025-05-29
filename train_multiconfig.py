@@ -30,6 +30,7 @@ def run_experiment(dataset: str, graph_type: str, params: Dict):
         hidden_channels=params["hidden_channels"],
         num_layers=params["num_layers"],
         lr=params["lr"],
+        dataset_name=dataset, # noqa
     )
 
     logger = WandbLogger(

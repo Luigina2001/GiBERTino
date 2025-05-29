@@ -34,10 +34,16 @@ def explore_features(dataset, dataset_name):
 
     # --- UNIQUE RELATIONSHIP TYPES ---
     relation_types = set()
+    relation_counts = defaultdict(int)
     for entry in dataset:
-        relation_types.update(rel["type"] for rel in entry["relations"])
+        for rel in entry["relations"]:
+            relation_types.add(rel["type"])
+            relation_counts[rel["type"]] += 1
+
     print("\nUnique relationship types in the dataset:")
     print(relation_types)
+    print("\nRelationship counts:")
+    print(relation_counts)
 
 
 def count_sentence_length(dataset_train, dataset_val, dataset_test, name):
@@ -249,17 +255,20 @@ def compare_datasets(datasets):  # noqa
 if __name__ == "__main__":
 
     DATA_ROOT = Path("../../data")
+    # dataset_paths = {
+    #     "TEST_133": DATA_ROOT / "MINECRAFT/TEST_133.json",
+    #     "TEST_101_bert": DATA_ROOT / "MINECRAFT/TEST_101_bert.json",
+    #     "DEV_32_bert": DATA_ROOT / "MINECRAFT/DEV_32_bert.json",
+    #     "TRAIN_307_bert": DATA_ROOT / "MINECRAFT/TRAIN_307_bert.json",
+    #     "VAL_100_bert": DATA_ROOT / "MINECRAFT/VAL_100_bert.json",
+    #     "MOLWENI_dev": DATA_ROOT / "MOLWENI/dev.json",
+    #     "MOLWENI_test": DATA_ROOT / "MOLWENI/test.json",
+    #     "MOLWENI_train": DATA_ROOT / "MOLWENI/train.json",
+    #     "STAC_test": DATA_ROOT / "STAC/test_subindex.json",
+    #     "STAC_train": DATA_ROOT / "STAC/train_subindex.json",
+    # }
     dataset_paths = {
-        "TEST_133": DATA_ROOT / "MINECRAFT/TEST_133.json",
-        "TEST_101_bert": DATA_ROOT / "MINECRAFT/TEST_101_bert.json",
-        "DEV_32_bert": DATA_ROOT / "MINECRAFT/DEV_32_bert.json",
-        "TRAIN_307_bert": DATA_ROOT / "MINECRAFT/TRAIN_307_bert.json",
-        "VAL_100_bert": DATA_ROOT / "MINECRAFT/VAL_100_bert.json",
-        "MOLWENI_dev": DATA_ROOT / "MOLWENI/dev.json",
-        "MOLWENI_test": DATA_ROOT / "MOLWENI/test.json",
-        "MOLWENI_train": DATA_ROOT / "MOLWENI/train.json",
-        "STAC_test": DATA_ROOT / "STAC/test_subindex.json",
-        "STAC_train": DATA_ROOT / "STAC/train_subindex.json",
+        "BALANCED_train": DATA_ROOT / "BALANCED/train.json",
     }
 
     MERGED_ROOT = DATA_ROOT / "MERGED"
@@ -275,9 +284,9 @@ if __name__ == "__main__":
         datasets[name] = load_dataset(path)
         explore_features(datasets[name], name)
 
-    compare_datasets(datasets)
-    print(f"\n\n\n{final_global_relations}")
-    print(len(final_global_relations))
+    # compare_datasets(datasets)
+    # print(f"\n\n\n{final_global_relations}")
+    # print(len(final_global_relations))
 
     # train_data = load_dataset(str(merged_datasets["TRAIN"]))
     # val_data = load_dataset(str(merged_datasets["VAL"]))
