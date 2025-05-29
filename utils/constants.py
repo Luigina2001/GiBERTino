@@ -1,5 +1,6 @@
 import os.path as osp
-from torchmetrics.classification import Accuracy, Precision, Recall, F1Score, BinaryAUROC, AUROC
+
+from torchmetrics.classification import Accuracy, Precision, Recall, F1Score, AUROC
 
 DATA_DIR = "data"
 MOLWENI = "MOLWENI"
@@ -140,22 +141,22 @@ RELATIONS = {
 }
 
 RELATIONS_COLOR_MAPS = {
-    "Comment": "#FF5733",  # Reddish Orange
-    "Elaboration": "#33A1FF",  # Light Blue
-    "QAP": "#33FF57",  # Green
-    "Q-Elab": "#FFC300",  # Yellow
-    "Explanation": "#C70039",  # Deep Red
-    "Result": "#900C3F",  # Dark Purple
-    "Continuation": "#581845",  # Dark Violet
-    "Acknowledgement": "#8E44AD",  # Purple
-    "Contrast": "#2E86C1",  # Blue
-    "Conditional": "#27AE60",  # Dark Green
-    "Correction": "#E74C3C",  # Red
-    "Background": "#1ABC9C",  # Teal
-    "Parallel": "#D35400",  # Orange
-    "Alternation": "#F39C12",  # Gold
-    "Clarification_question": "#3498DB",  # Sky Blue
-    "Narration": "#2C3E50",  # Dark Blue
-    "Confirmation_question": "#FF33A8",  # Pink
-    "Sequence": "#76448A",  # Deep Purple
+    "Comment": "#e6194b",             # Strong Red
+    "Elaboration": "#3cb44b",         # Vivid Green
+    "QAP": "#ffe119",                 # Bright Yellow
+    "Q-Elab": "#0082c8",              # Medium Blue
+    "Explanation": "#f58231",         # Orange
+    "Result": "#911eb4",              # Deep Purple
+    "Continuation": "#46f0f0",        # Cyan
+    "Acknowledgement": "#f032e6",     # Magenta
+    "Contrast": "#d2f53c",            # Lime
+    "Conditional": "#fabebe",         # Pink
+    "Correction": "#008080",          # Teal
+    "Background": "#e6beff",          # Lavender
+    "Parallel": "#aa6e28",            # Brown
+    "Alternation": "#fffac8",         # Pale Yellow
+    "Clarification_question": "#800000", # Maroon
+    "Narration": "#aaffc3",           # Mint
+    "Confirmation_question": "#808000", # Olive
+    "Sequence": "#ffd8b1",            # Apricot
 }
