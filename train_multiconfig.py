@@ -1,3 +1,5 @@
+import wandb
+
 from typing import Dict
 
 from lightning.pytorch import Trainer
@@ -32,6 +34,8 @@ def run_experiment(dataset: str, graph_type: str, params: Dict):
         lr=params["lr"],
         dataset_name=dataset, # noqa
     )
+
+    wandb.finish()
 
     logger = WandbLogger(
         name=experiment_name,
@@ -92,8 +96,8 @@ def main():
         },
     }
 
-    datasets = ["STAC", "MOLWENI", "MINECRAFT", "BALANCED"]
-    graph_types = ["alibaba", "dialogpt"]
+    datasets = ["STAC"] #  "MOLWENI", "MINECRAFT", "BALANCED"]
+    graph_types = ["alibaba"] #  "dialogpt"]
 
     for model_name, params in configurations.items():
         params["gnn_model"] = model_name
