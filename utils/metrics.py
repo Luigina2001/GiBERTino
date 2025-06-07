@@ -34,8 +34,8 @@ class Metrics:
                     METRICS["rel"][metric](task='multiclass', num_classes=self.num_classes, average='macro').to(
                         self.device))
 
-        self.sbert_model = SentenceTransformer(sentence_model).to(self.device)
-        self.sbert_model.eval()
+        # self.sbert_model = SentenceTransformer(sentence_model).to(self.device)
+        # self.sbert_model.eval()
 
     def log(self, metrics: dict, stage: str, step: int):
         for key, value in metrics.items():
