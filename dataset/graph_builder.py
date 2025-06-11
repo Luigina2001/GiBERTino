@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 8
+BATCH_SIZE = 256
 
 
 class GraphBuilder:
@@ -72,7 +72,7 @@ class GraphBuilder:
 
         if self.tokenizer.pad_token is None:
             logger.info(f"Tokenizer pad token to {self.tokenizer.pad_token}.")
-            self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+            self.tokenizer.pad_token = self.tokenizer.eos_token
 
         logger.info(f"Load pretrained sentiment analysis model: {sentiment_model}.")
         self.sentiment_model = pipeline("sentiment-analysis", model=sentiment_model, device=self.device)
@@ -103,11 +103,15 @@ class GraphBuilder:
         if str(self.device) != 'cpu':
             getattr(torch, str(self.device)).empty_cache()
 
-        for speaker in speakers_list:
+        for idx, speaker in enumerate(speakers_list):
+            if idx > len(edus):
+                break
             if speaker not in speakers:
                 speakers[speaker] = len(speakers)
             speakers_ids.append(speakers[speaker])
 
+        if sentiment_labels.shape[0] != len(speakers_ids):
+            speakers_ids = speakers_ids[:sentiment_labels.shape[0]]
         speakers_ids = torch.tensor(speakers_ids, dtype=torch.int8, device=self.device)
         sentiment_labels = sentiment_labels.unsqueeze(1)
         speakers_ids = speakers_ids.unsqueeze(1)
@@ -147,11 +151,15 @@ class GraphBuilder:
             augmented = False
 
             for edu in dialog["edus"]:
+                if len(edu["text"]) > 128:
+                    continue
                 edus.append(edu['text'])
                 speakers_list.append(edu['speaker'])
 
                 if self.backtranslation is not None:
                     augmented_text = self.backtranslation(edu['text'])
+                    if len(augmented_text) > 128:
+                        continue
                     augmented_edus.append(augmented_text)
                     augmented = augmented_text != edu['text']
 

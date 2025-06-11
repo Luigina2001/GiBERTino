@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 
 import yaml
 import re
-import tempfile
+# import tempfile
 import torch
 import logging
 from bayes_opt import BayesianOptimization

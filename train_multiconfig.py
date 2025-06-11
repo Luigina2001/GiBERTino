@@ -8,14 +8,20 @@ from lightning.pytorch.loggers import WandbLogger
 
 from dataset import SubDialogueDataModule
 from model import GiBERTino
+from utils.constants import RELATIONS
 
 
 def run_experiment(dataset: str, graph_type: str, params: Dict):
     log_steps = {"STAC": 5, "MOLWENI": 15, "MINECRAFT": 50, "BALANCED": 50}[dataset]
 
-    experiment_name = f"giBERTino-{graph_type}-{params['gnn_model']}-{dataset}"
+    experiment_name = f"giBERTino-improved-{params['gnn_model']}-{dataset}"
     data_root = f"data/{dataset}/{graph_type}-graphs"
-    log_dir = f"./lightning_logs/{experiment_name}"
+    log_dir = f"./lightning_logs/baselines/{experiment_name}"
+
+    tokenizer = "Alibaba-NLP/gte-modernbert-base"
+    bert_model = "Alibaba-NLP/gte-modernbert-base"
+
+    # TODO: explore with dialogpt
 
     print(f"\n{'#' * 50}")
     print(f"Starting {experiment_name}")
@@ -31,21 +37,23 @@ def run_experiment(dataset: str, graph_type: str, params: Dict):
         gnn_model=params["gnn_model"],
         hidden_channels=params["hidden_channels"],
         num_layers=params["num_layers"],
+        num_relations=len(RELATIONS['UNIFIED']),
         lr=params["lr"],
         dataset_name=dataset, # noqa
+        tokenizer=tokenizer,
+        bert_model=bert_model
     )
 
     wandb.finish()
 
     logger = WandbLogger(
         name=experiment_name,
-        save_dir="lightning_logs",
+        save_dir="lightning_logs/improved",
         project="giBERTino",
         log_model=False,
-        reinit=True,
     )
 
-    # Initialize callbacks
+    # Initialize callbadocks
     early_stop = EarlyStopping(
         monitor="val_loss",
         min_delta=0.0,
@@ -69,12 +77,16 @@ def run_experiment(dataset: str, graph_type: str, params: Dict):
     )
 
     trainer = Trainer(
+        precision="16-mixed",
         accelerator="auto",
+        gpus=[0, 1],
         max_epochs=30,
         logger=logger,
         callbacks=[early_stop, checkpoint_callback],
         log_every_n_steps=log_steps,
         default_root_dir=log_dir,
+        gradient_clip_val=1.0,
+        gradient_clip_algorithm="norm"
     )
 
     try:
@@ -96,8 +108,8 @@ def main():
         },
     }
 
-    datasets = ["STAC"] #  "MOLWENI", "MINECRAFT", "BALANCED"]
-    graph_types = ["alibaba"] #  "dialogpt"]
+    datasets = [ "STAC", "MOLWENI", "MINECRAFT", "BALANCED"]
+    graph_types = ["alibaba"]
 
     for model_name, params in configurations.items():
         params["gnn_model"] = model_name

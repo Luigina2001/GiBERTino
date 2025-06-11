@@ -9,8 +9,9 @@ sentencepiece==0.2.0
 sacremoses==0.0.41
 jsonargparse[signatures]>=4.27.7
 wandb==0.19.11
-imageio==2.3.7
+imageio==2.37.0
 sacremoses==0.0.41
 rich==14.0.0
 sentence_transformers==4.1.0
 tensorboard==2.19.0
+emoji==0.6.0

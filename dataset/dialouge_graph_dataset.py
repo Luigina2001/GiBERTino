@@ -21,7 +21,6 @@ class DialogueGraphDataset(InMemoryDataset):
     ):
         self.device = get_device()
         self.relations = RELATIONS["UNIFIED"]
-        self.relations.append("Unknown")
         self.negative_sampling_ratio = negative_sampling_ratio
 
         super().__init__(root, transform, pre_transform, pre_filter)
@@ -82,13 +81,8 @@ class DialogueGraphDataset(InMemoryDataset):
             link_labels = torch.tensor(
                 np.array([1] * len(pos_edges) + [0] * len(neg_edges)), dtype=torch.long
             )
-            # label: [0-11] for pos, 12 for neg
-            rel_labels = torch.tensor(
-                np.array(
-                    rel_labels + [self.encode_relation_type("Unknown")] * len(neg_edges)
-                ),
-                dtype=torch.long,
-            )
+
+            rel_labels = torch.tensor(np.array(rel_labels), dtype=torch.long,)
 
             new_graph = HeteroData()
             new_graph["edu"].x = graph["edu"].x
