@@ -1,7 +1,7 @@
 <div align="center">
     <img src="https://github.com/user-attachments/assets/52b8223d-5740-47c4-b699-9497c6c52a9b" alt="GiBERTino logo" width="300"/>
     <h1>GiBERTino</h1>
-    <h3>Supervised extracted of sub-dialogues from multi-part dialogues</h3>
+    <h3>Supervised extraction of sub-dialogues from multi-part dialogues</h3>
 </div>
 
 <p align="center">
